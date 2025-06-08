@@ -4,7 +4,7 @@ aiohttp
 uvicorn
 aiogram
 aiogram==3.7.0
-pip install --upgrade aiohttp==3.9.5
+aiohttp==3.9.5
 requests>=2.28.1
 python-dotenv>=1.0.0
 beautifulsoup4>=4.11.1
