@@ -1,59 +1,118 @@
-import os
-import json
 import asyncio
-from datetime import datetime
-import pytz
+import json
 from aiogram import Bot, Dispatcher
-from aiogram.enums.parse_mode import ParseMode
-from aiogram.client.default import DefaultBotProperties
+from aiogram.types import Message
+from datetime import datetime
+import aiohttp
+import pytz
+import re
+import os
 
+# === Configurações ===
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
 GRUPO_ID = os.getenv("TELEGRAM_GRUPO_ID", "-1002520564793")
-
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
-ULTIMO_ENVIO = ""
-
+URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+VELA_MINIMA = 2.0
+VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
 
-@dp.startup()
-async def iniciar(_):
-    print("[BOT] Telegram iniciado")
+bot = Bot(token=TOKEN, parse_mode="HTML")
+dp = Dispatcher()
 
-async def enviar_sinais():
-    global ULTIMO_ENVIO
+VELAS = []
+ULTIMO_MULT = None
+ULTIMO_ENVIO = None
 
-    while True:
-        try:
-            with open("sinais.json") as f:
-                sinais = json.load(f)
-            if sinais:
-                novo = sinais[-1]
-                if novo["timestamp"] != ULTIMO_ENVIO:
-                    hora_atual = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
-                    msg = (
-                        f"📡 <b>NOVO SINAL DETECTADO</b>\n\n"
-                        f"🎯 <b>Jogo:</b> {novo['jogo']}\n"
-                        f"📈 <b>Multiplicador:</b> <code>{novo['multiplicador']}x</code>\n"
-                        f"⏱️ <b>Hora:</b> {novo['hora']} (Luanda {hora_atual})\n\n"
-                        f"⚡ Prepare-se para a próxima entrada!\n"
-                        f"🎰 <a href='https://bit.ly/449TH4F'>Acesse o Jogo Agora</a>\n"
-                    )
-                    await bot.send_message(CHAT_ID, msg, disable_web_page_preview=True)
-                    print(f"[+] Sinal enviado: {novo['jogo']} - {novo['multiplicador']}x - {hora_atual}")
-                    ULTIMO_ENVIO = novo["timestamp"]
-        except Exception as e:
-            print(f"[ERRO] {e}")
-        await asyncio.sleep(10)
+def prever_proxima_entrada(ultimas):
+    if len(ultimas) < 2:
+        return False, 0
+    if ultimas[-1] < 2.0 and ultimas[-2] < 2.0:
+        chance = 90 + round((2.0 - ultimas[-1]) * 5 + (2.0 - ultimas[-2]) * 5, 1)
+        return True, min(chance, 99.9)
+    return False, 0
 
-async def watchdog():
-    while True:
-        agora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
-        print(f"[Watchdog] Bot está vivo - {agora} (Luanda)")
-        await asyncio.sleep(300)  # 5 minutos
+async def obter_html(session):
+    async with session.get(URL, timeout=10) as resp:
+        return await resp.text()
 
-async def iniciar_bot():
-    asyncio.create_task(enviar_sinais())
-    asyncio.create_task(watchdog())
-    await dp.start_polling(bot)
+def extrair_velas(html):
+    padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
+    valores = re.findall(padrao, html)
+    return [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
+
+async def enviar_sinal(sinal):
+    texto = (
+        "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
+        f"⏰ <b>Hora:</b> {sinal['hora']}\n"
+        f"🎯 <b>Multiplicador:</b> <code>{sinal['multiplicador']}x</code>\n"
+        f"📊 <b>Classificação:</b> {sinal['tipo']}\n"
+        f"🔮 <b>Previsão:</b> {sinal['previsao']}\n\n"
+    )
+    if sinal["mensagem"]:
+        texto += f"{sinal['mensagem']}\n\n"
+
+    texto += "💰 Cadastre-se e aposte com bônus:\n👉 <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
+
+    try:
+        await bot.send_message(GRUPO_ID, texto)
+        await bot.send_message(USUARIO_PIO, texto)
+    except Exception as e:
+        print(f"[ERRO ENVIO] {e}")
+
+async def iniciar_scraping():
+    global VELAS, ULTIMO_MULT, ULTIMO_ENVIO
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                html = await obter_html(session)
+                velas = extrair_velas(html)
+                if not velas:
+                    await asyncio.sleep(10)
+                    continue
+
+                nova = velas[-1]
+                if nova != ULTIMO_MULT:
+                    VELAS.append(nova)
+                    if len(VELAS) > 20:
+                        VELAS.pop(0)
+
+                    ULTIMO_MULT = nova
+                    hora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
+                    ts = datetime.now().isoformat()
+                    prever, chance = prever_proxima_entrada(VELAS)
+
+                    tipo = "🔥 Alta (≥2x)" if nova >= VELA_MINIMA else "🔻 Baixa (<2x)"
+                    if nova >= VELA_RARA:
+                        tipo = "💎 Rara (≥100x)"
+
+                    sinal = {
+                        "jogo": "Aviator",
+                        "multiplicador": f"{nova:.2f}",
+                        "hora": hora,
+                        "timestamp": ts,
+                        "tipo": tipo,
+                        "previsao": f"{chance:.1f}%" if prever else "Nenhuma",
+                        "mensagem": (
+                            "🚀 <b>Momento ideal para entrada!</b>\n"
+                            f"🎯 Aposte na próxima rodada com confiança.\n"
+                            f"📊 Chance estimada: <b>{chance:.1f}%</b>"
+                        ) if prever else None
+                    }
+
+                    if sinal != ULTIMO_ENVIO:
+                        await enviar_sinal(sinal)
+                        ULTIMO_ENVIO = sinal
+
+            except Exception as e:
+                print(f"[ERRO SCRAPER] {e}")
+            await asyncio.sleep(10)
+
+async def main():
+    await asyncio.gather(
+        dp.start_polling(bot),
+        iniciar_scraping()
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
