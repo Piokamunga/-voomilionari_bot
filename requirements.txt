@@ -12,3 +12,6 @@ lxml>=4.9.2
 uvloop>=0.17.0
 loguru>=0.7.0
 pytz>=2024.1
+pip install
+aiogram
+matplotlib
