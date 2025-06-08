@@ -11,4 +11,4 @@ beautifulsoup4>=4.11.1
 lxml>=4.9.2
 uvloop>=0.17.0
 loguru>=0.7.0
-pytz
+pytz>=2024.1
