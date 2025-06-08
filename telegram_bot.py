@@ -2,13 +2,14 @@ import asyncio
 import json
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message
+from aiogram.client.default import DefaultBotProperties
 from datetime import datetime
 import aiohttp
 import pytz
 import re
 import os
 
-# === Configurações ===
+# === ConfiguraÃ§Ãµes ===
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
 GRUPO_ID = os.getenv("TELEGRAM_GRUPO_ID", "-1002520564793")
@@ -17,7 +18,7 @@ VELA_MINIMA = 2.0
 VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
 
-bot = Bot(token=TOKEN, parse_mode="HTML")
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 VELAS = []
@@ -43,20 +44,20 @@ def extrair_velas(html):
 
 async def enviar_sinal(sinal):
     texto = (
-        "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
-        f"⏰ <b>Hora:</b> {sinal['hora']}\n"
-        f"🎯 <b>Multiplicador:</b> <code>{sinal['multiplicador']}x</code>\n"
-        f"📊 <b>Classificação:</b> {sinal['tipo']}\n"
-        f"🔮 <b>Previsão:</b> {sinal['previsao']}\n\n"
+        "ðŸŽ° <b>SINAL DETECTADO - AVIATOR</b>\n\n"
+        f"â° <b>Hora:</b> {sinal['hora']}\n"
+        f"ðŸŽ¯ <b>Multiplicador:</b> <code>{sinal['multiplicador']}x</code>\n"
+        f"ðŸ“Š <b>ClassificaÃ§Ã£o:</b> {sinal['tipo']}\n"
+        f"ðŸ”® <b>PrevisÃ£o:</b> {sinal['previsao']}\n\n"
     )
     if sinal["mensagem"]:
         texto += f"{sinal['mensagem']}\n\n"
 
-    texto += "💰 Cadastre-se e aposte com bônus:\n👉 <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
+    texto += "ðŸ’° Cadastre-se e aposte com bÃ´nus:\nðŸ‘‰ <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
 
     try:
         await bot.send_message(GRUPO_ID, texto)
-        await bot.send_message(USUARIO_PIO, texto)
+        await bot.send_message(CHAT_ID, texto)
     except Exception as e:
         print(f"[ERRO ENVIO] {e}")
 
@@ -82,9 +83,9 @@ async def iniciar_scraping():
                     ts = datetime.now().isoformat()
                     prever, chance = prever_proxima_entrada(VELAS)
 
-                    tipo = "🔥 Alta (≥2x)" if nova >= VELA_MINIMA else "🔻 Baixa (<2x)"
+                    tipo = "ðŸ”¥ Alta (â‰¥2x)" if nova >= VELA_MINIMA else "ðŸ”» Baixa (<2x)"
                     if nova >= VELA_RARA:
-                        tipo = "💎 Rara (≥100x)"
+                        tipo = "ðŸ’Ž Rara (â‰¥100x)"
 
                     sinal = {
                         "jogo": "Aviator",
@@ -94,9 +95,9 @@ async def iniciar_scraping():
                         "tipo": tipo,
                         "previsao": f"{chance:.1f}%" if prever else "Nenhuma",
                         "mensagem": (
-                            "🚀 <b>Momento ideal para entrada!</b>\n"
-                            f"🎯 Aposte na próxima rodada com confiança.\n"
-                            f"📊 Chance estimada: <b>{chance:.1f}%</b>"
+                            "ðŸš€ <b>Momento ideal para entrada!</b>\n"
+                            f"ðŸŽ¯ Aposte na prÃ³xima rodada com confianÃ§a.\n"
+                            f"ðŸ“Š Chance estimada: <b>{chance:.1f}%</b>"
                         ) if prever else None
                     }
 
