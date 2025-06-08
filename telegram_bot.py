@@ -4,7 +4,7 @@ import json
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums.parse_mode import ParseMode
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "API_TOKEN = '7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38')
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
 
 bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
