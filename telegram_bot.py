@@ -5,9 +5,10 @@ import re
 import pytz
 from datetime import datetime
 import aiohttp
+import matplotlib.pyplot as plt
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode, Message
+from aiogram.types import ParseMode, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 # === Configurações ===
@@ -25,6 +26,7 @@ dp = Dispatcher()
 VELAS = []
 ULTIMO_MULT = None
 ULTIMO_ENVIO = None
+CONTADOR = 0
 
 # === Comando /start ===
 @dp.message_handler(commands=['start'])
@@ -60,7 +62,7 @@ async def enviar_sinal(sinal):
     if sinal["mensagem"]:
         texto += f"{sinal['mensagem']}\n\n"
 
-    texto += "💰 Cadastre-se e aposte com bônus:\n👉 <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
+    texto += "💰 Cadastre-se com bônus:\n👉 <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
 
     try:
         await bot.send_message(GRUPO_ID, texto)
@@ -68,8 +70,37 @@ async def enviar_sinal(sinal):
     except Exception as e:
         print(f"[ERRO ENVIO] {e}")
 
+def gerar_grafico_acertos(velas):
+    acertos = [1 if v >= VELA_MINIMA else 0 for v in velas]
+    plt.figure(figsize=(10, 3))
+    plt.plot(acertos, marker='o', linestyle='-', color='green')
+    plt.title("Gráfico de Acertos (≥2x)")
+    plt.xlabel("Rodadas")
+    plt.ylabel("Acerto")
+    plt.grid(True)
+    plt.tight_layout()
+    os.makedirs("static", exist_ok=True)
+    plt.savefig("static/chart.png")
+    plt.close()
+
+async def enviar_grafico():
+    try:
+        gerar_grafico_acertos(VELAS)
+        botao = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔗 Cadastre-se com bônus", url="https://bit.ly/449TH4F")]
+        ])
+        for chat in [GRUPO_ID, CHAT_ID]:
+            await bot.send_photo(
+                chat,
+                photo=types.FSInputFile("static/chart.png"),
+                caption="📈 <b>Gráfico atualizado dos últimos sinais</b>",
+                reply_markup=botao
+            )
+    except Exception as e:
+        print(f"[ERRO GRAFICO] {e}")
+
 async def iniciar_scraping():
-    global VELAS, ULTIMO_MULT, ULTIMO_ENVIO
+    global VELAS, ULTIMO_MULT, ULTIMO_ENVIO, CONTADOR
     async with aiohttp.ClientSession() as session:
         while True:
             try:
@@ -111,6 +142,11 @@ async def iniciar_scraping():
                     if sinal != ULTIMO_ENVIO:
                         await enviar_sinal(sinal)
                         ULTIMO_ENVIO = sinal
+                        CONTADOR += 1
+
+                        # A cada 10 sinais, envia gráfico
+                        if CONTADOR % 10 == 0:
+                            await enviar_grafico()
 
             except Exception as e:
                 print(f"[ERRO SCRAPER] {e}")
