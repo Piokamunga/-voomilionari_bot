@@ -1,14 +1,13 @@
-# -*- coding: utf-8 -*-
 import asyncio
 import json
-import os
-import re
+from aiogram import Bot, Dispatcher
+from aiogram.types import Message
+from aiogram.client.default import DefaultBotProperties
 from datetime import datetime
-
 import aiohttp
 import pytz
-from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
+import re
+import os
 
 # === Configurações ===
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
@@ -23,9 +22,8 @@ bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 VELAS = []
-ULTIMO_ENVIO = None
 ULTIMO_MULT = None
-
+ULTIMO_ENVIO = None
 
 def prever_proxima_entrada(ultimas):
     if len(ultimas) < 2:
@@ -35,31 +33,25 @@ def prever_proxima_entrada(ultimas):
         return True, min(chance, 99.9)
     return False, 0
 
-
 async def obter_html(session):
     async with session.get(URL, timeout=10) as resp:
         return await resp.text()
-
 
 def extrair_velas(html):
     padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
     valores = re.findall(padrao, html)
     return [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
 
-
 async def enviar_sinal(sinal):
     texto = (
         "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
-        f"🕐 <b>Hora:</b> {sinal['hora']}\n"
+        f"⏰ <b>Hora:</b> {sinal['hora']}\n"
         f"🎯 <b>Multiplicador:</b> <code>{sinal['multiplicador']}x</code>\n"
         f"📊 <b>Classificação:</b> {sinal['tipo']}\n"
         f"🔮 <b>Previsão:</b> {sinal['previsao']}\n\n"
     )
     if sinal["mensagem"]:
         texto += f"{sinal['mensagem']}\n\n"
-
-    if float(sinal["multiplicador"]) >= VELA_RARA:
-        texto += "💎 <b>Multiplicador raro detectado! Oportunidade única!</b>\n\n"
 
     texto += "💰 Cadastre-se e aposte com bônus:\n👉 <a href='https://bit.ly/449TH4F'>https://bit.ly/449TH4F</a>"
 
@@ -68,15 +60,6 @@ async def enviar_sinal(sinal):
         await bot.send_message(CHAT_ID, texto)
     except Exception as e:
         print(f"[ERRO ENVIO] {e}")
-
-    # (Opcional) Registrar sinal em arquivo
-    try:
-        with open("sinais.json", "a", encoding="utf-8") as f:
-            json.dump(sinal, f, ensure_ascii=False)
-            f.write(",\n")
-    except Exception as e:
-        print(f"[ERRO LOG SINAL] {e}")
-
 
 async def iniciar_scraping():
     global VELAS, ULTIMO_MULT, ULTIMO_ENVIO
@@ -118,32 +101,16 @@ async def iniciar_scraping():
                         ) if prever else None
                     }
 
-                    # Evita repetição se mesmo multiplicador e previsão já foram enviados
-                    if not ULTIMO_ENVIO or (
-                        sinal["multiplicador"] != ULTIMO_ENVIO["multiplicador"]
-                        or sinal["previsao"] != ULTIMO_ENVIO["previsao"]
-                    ):
+                    if sinal != ULTIMO_ENVIO:
                         await enviar_sinal(sinal)
                         ULTIMO_ENVIO = sinal
-
-                        # Log simples (opcional)
-                        try:
-                            with open("logs.txt", "a", encoding="utf-8") as f:
-                                f.write(f"[{hora}] {sinal['multiplicador']}x | {sinal['tipo']} | Prev: {sinal['previsao']}\n")
-                        except:
-                            pass
 
             except Exception as e:
                 print(f"[ERRO SCRAPER] {e}")
             await asyncio.sleep(10)
 
-
 async def main():
     await asyncio.gather(
         dp.start_polling(bot),
         iniciar_scraping()
-    )
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+)
