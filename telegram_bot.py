@@ -8,7 +8,7 @@ import aiohttp
 import matplotlib.pyplot as plt
 
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 # === Configurações ===
@@ -45,14 +45,14 @@ def prever_proxima_entrada(ultimas):
 async def obter_html(session):
     async with session.get(URL, timeout=10) as resp:
         html = await resp.text()
-        print("[DEBUG] HTML recebido com tamanho:", len(html))
+        print("[HTML RAW]", html[:300])  # Exibe os primeiros 300 caracteres
         return html
 
 def extrair_velas(html):
     padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
     valores = re.findall(padrao, html)
     velas_extraidas = [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
-    print(f"[DEBUG] Velas extraídas: {velas_extraidas}")
+    print(f"[VELAS EXTRAÍDAS] {velas_extraidas}")
     return velas_extraidas
 
 async def enviar_sinal(sinal):
@@ -119,7 +119,7 @@ async def iniciar_scraping():
                     continue
 
                 nova = velas[-1]
-                print(f"[DEBUG] Vela nova detectada: {nova} (última enviada: {ULTIMO_MULT})")
+                print(f"[NOVA VELA] {nova} | [ANTERIOR] {ULTIMO_MULT}")
 
                 if nova != ULTIMO_MULT:
                     VELAS.append(nova)
@@ -154,13 +154,10 @@ async def iniciar_scraping():
                         ULTIMO_ENVIO = sinal
                         CONTADOR += 1
 
-                        # A cada 10 sinais, envia gráfico
                         if CONTADOR % 10 == 0:
                             await enviar_grafico()
-
                 else:
                     print("[DEBUG] Nenhuma nova vela para enviar.")
-
             except Exception as e:
                 print(f"[ERRO SCRAPER] {e}")
             await asyncio.sleep(10)
