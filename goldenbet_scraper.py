@@ -1,55 +1,87 @@
+import aiohttp
 import asyncio
 import json
-import os
-import aiohttp
+import re
 from datetime import datetime
+import pytz
 
+URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+LUANDA_TZ = pytz.timezone("Africa/Luanda")
 SINAIS_FILE = "sinais.json"
-VELA_LIMITE = 2.0
-VELA_ESPECIAL = 100.0
+VELA_MINIMA = 2.0
+VELA_RARA = 100.0
 
-sinais_ativos = []
+VELAS = []
+ULTIMO_MULT = None
+SINAIS_ATIVOS = []
 
-async def obter_velas():
-    url = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            text = await resp.text()
-            return text
+def prever_proxima_entrada(ultimas):
+    if len(ultimas) < 2:
+        return False, 0
+    if ultimas[-1] < 2.0 and ultimas[-2] < 2.0:
+        chance = 90 + round((2.0 - ultimas[-1]) * 5 + (2.0 - ultimas[-2]) * 5, 1)
+        return True, min(chance, 99.9)
+    return False, 0
+
+async def obter_html(session):
+    async with session.get(URL, timeout=10) as resp:
+        return await resp.text()
 
 def extrair_velas(html):
-    import re
     padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
     valores = re.findall(padrao, html)
-    return [float(v.strip('x')) for v in valores if 'x' in v]
+    return [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
 
-def salvar_sinais(sinais):
+def salvar_sinais():
     with open(SINAIS_FILE, "w") as f:
-        json.dump(sinais, f)
+        json.dump(SINAIS_ATIVOS[-30:], f, indent=2)
 
 async def iniciar_scraping():
-    while True:
-        try:
-            html = await obter_velas()
-            velas = extrair_velas(html)
-            novas = []
+    global ULTIMO_MULT
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                html = await obter_html(session)
+                velas = extrair_velas(html)
+                if not velas:
+                    await asyncio.sleep(10)
+                    continue
 
-            for valor in velas:
-                if valor >= VELA_LIMITE:
-                    tipo = "🔥 Alta (>2x)" if valor < VELA_ESPECIAL else "💎 Rara (>100x)"
+                nova = velas[-1]
+                if nova != ULTIMO_MULT:
+                    VELAS.append(nova)
+                    if len(VELAS) > 20:
+                        VELAS.pop(0)
+
+                    ULTIMO_MULT = nova
+                    hora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
+                    ts = datetime.now().isoformat()
+                    prever, chance = prever_proxima_entrada(VELAS)
+
+                    tipo = "🔥 Alta (≥2x)" if nova >= VELA_MINIMA else "🔻 Baixa (<2x)"
+                    if nova >= VELA_RARA:
+                        tipo = "💎 Rara (≥100x)"
+
                     sinal = {
-                        "valor": valor,
+                        "jogo": "Aviator",
+                        "multiplicador": f"{nova:.2f}",
+                        "hora": hora,
+                        "timestamp": ts,
                         "tipo": tipo,
-                        "timestamp": datetime.now().strftime("%H:%M:%S")
+                        "previsao": f"{chance:.1f}%" if prever else "Nenhuma",
+                        "mensagem": (
+                            "🚀 <b>Momento ideal para entrada!</b>\n"
+                            f"🎯 Aposte na próxima rodada com confiança.\n"
+                            f"📊 Chance estimada: <b>{chance:.1f}%</b>"
+                        ) if prever else None
                     }
-                    if sinal not in sinais_ativos:
-                        sinais_ativos.append(sinal)
-                        print(f"[SINAL] {sinal}")
-                        novas.append(sinal)
 
-            if novas:
-                salvar_sinais(sinais_ativos[-30:])
+                    if sinal not in SINAIS_ATIVOS:
+                        SINAIS_ATIVOS.append(sinal)
+                        salvar_sinais()
+                        print(f"[SINAL] {hora} | {nova:.2f}x | {tipo} | Previsão: {sinal['previsao']}")
 
-        except Exception as e:
-            print(f"[ERRO SCRAPER] {e}")
-        await asyncio.sleep(10)
+            except Exception as e:
+                print(f"[ERRO SCRAPER] {e}")
+
+            await asyncio.sleep(10)
