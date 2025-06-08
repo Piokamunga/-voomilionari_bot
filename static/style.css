@@ -1,0 +1,21 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+    padding: 2rem;
+}
+h1 {
+    color: #ffcc00;
+}
+.sinais {
+    display: grid;
+    gap: 1rem;
+}
+.sinal {
+    background: #222;
+    padding: 1rem;
+    border-left: 5px solid #ffcc00;
+}
+.tipo { font-weight: bold; }
+.valor { color: #0f0; }
+.hora { float: right; opacity: 0.6; }
