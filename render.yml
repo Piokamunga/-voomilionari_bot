@@ -1,0 +1,14 @@
+services:
+  - type: worker
+    name: voo-milionario
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38"
+      - key: TELEGRAM_CHAT_ID
+        value: "8101413562"
+      - key: TELEGRAM_GRUPO_ID
+        value: "-1002520564793"
