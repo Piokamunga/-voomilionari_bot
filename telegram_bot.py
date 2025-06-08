@@ -1,13 +1,14 @@
 import asyncio
 import json
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-from aiogram.client.default import DefaultBotProperties
+import os
+import re
+import pytz
 from datetime import datetime
 import aiohttp
-import pytz
-import re
-import os
+
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ParseMode, Message
+from aiogram.client.default import DefaultBotProperties
 
 # === Configurações ===
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
@@ -18,13 +19,19 @@ VELA_MINIMA = 2.0
 VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
 
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 VELAS = []
 ULTIMO_MULT = None
 ULTIMO_ENVIO = None
 
+# === Comando /start ===
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
+    await message.reply("🤖 Bot Aviator está online e monitorando as velas em tempo real!")
+
+# === Funções principais ===
 def prever_proxima_entrada(ultimas):
     if len(ultimas) < 2:
         return False, 0
@@ -45,7 +52,7 @@ def extrair_velas(html):
 async def enviar_sinal(sinal):
     texto = (
         "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
-        f"⏰ <b>Hora:</b> {sinal['hora']}\n"
+        f"🕐 <b>Hora:</b> {sinal['hora']}\n"
         f"🎯 <b>Multiplicador:</b> <code>{sinal['multiplicador']}x</code>\n"
         f"📊 <b>Classificação:</b> {sinal['tipo']}\n"
         f"🔮 <b>Previsão:</b> {sinal['previsao']}\n\n"
@@ -109,8 +116,12 @@ async def iniciar_scraping():
                 print(f"[ERRO SCRAPER] {e}")
             await asyncio.sleep(10)
 
+# === Inicializador principal ===
 async def main():
     await asyncio.gather(
         dp.start_polling(bot),
         iniciar_scraping()
-)
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
