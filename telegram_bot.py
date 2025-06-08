@@ -44,12 +44,16 @@ def prever_proxima_entrada(ultimas):
 
 async def obter_html(session):
     async with session.get(URL, timeout=10) as resp:
-        return await resp.text()
+        html = await resp.text()
+        print("[DEBUG] HTML recebido com tamanho:", len(html))
+        return html
 
 def extrair_velas(html):
     padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
     valores = re.findall(padrao, html)
-    return [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
+    velas_extraidas = [float(v.strip('x')) for v in valores if 'x' in v and v.replace("x", "").replace(".", "", 1).isdigit()]
+    print(f"[DEBUG] Velas extraídas: {velas_extraidas}")
+    return velas_extraidas
 
 async def enviar_sinal(sinal):
     texto = (
@@ -67,6 +71,7 @@ async def enviar_sinal(sinal):
     try:
         await bot.send_message(GRUPO_ID, texto)
         await bot.send_message(CHAT_ID, texto)
+        print(f"[INFO] Sinal enviado: {sinal['multiplicador']}x às {sinal['hora']}")
     except Exception as e:
         print(f"[ERRO ENVIO] {e}")
 
@@ -82,6 +87,7 @@ def gerar_grafico_acertos(velas):
     os.makedirs("static", exist_ok=True)
     plt.savefig("static/chart.png")
     plt.close()
+    print("[INFO] Gráfico gerado e salvo em static/chart.png")
 
 async def enviar_grafico():
     try:
@@ -96,6 +102,7 @@ async def enviar_grafico():
                 caption="📈 <b>Gráfico atualizado dos últimos sinais</b>",
                 reply_markup=botao
             )
+        print("[INFO] Gráfico enviado para os chats")
     except Exception as e:
         print(f"[ERRO GRAFICO] {e}")
 
@@ -107,10 +114,13 @@ async def iniciar_scraping():
                 html = await obter_html(session)
                 velas = extrair_velas(html)
                 if not velas:
+                    print("[WARN] Nenhuma vela extraída, aguardando próximo ciclo...")
                     await asyncio.sleep(10)
                     continue
 
                 nova = velas[-1]
+                print(f"[DEBUG] Vela nova detectada: {nova} (última enviada: {ULTIMO_MULT})")
+
                 if nova != ULTIMO_MULT:
                     VELAS.append(nova)
                     if len(VELAS) > 20:
@@ -147,6 +157,9 @@ async def iniciar_scraping():
                         # A cada 10 sinais, envia gráfico
                         if CONTADOR % 10 == 0:
                             await enviar_grafico()
+
+                else:
+                    print("[DEBUG] Nenhuma nova vela para enviar.")
 
             except Exception as e:
                 print(f"[ERRO SCRAPER] {e}")
