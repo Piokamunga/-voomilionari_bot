@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Painel de Sinais</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>📡 Sinais Detectados</h1>
+    <div class="sinais">
+        {% for sinal in sinais %}
+            <div class="sinal">
+                <span class="tipo">{{ sinal.tipo }}</span>
+                <span class="valor">{{ sinal.valor }}x</span>
+                <span class="hora">{{ sinal.timestamp }}</span>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+  </html>
