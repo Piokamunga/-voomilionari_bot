@@ -15,7 +15,10 @@ from aiogram.client.default import DefaultBotProperties
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
 GRUPO_ID = os.getenv("TELEGRAM_GRUPO_ID", "-1002520564793")
-URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+LOGIN_URL = "https://m.goldenbet.ao/index/login"
+GAME_URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+USERNAME = os.getenv("GB_USERNAME", "958752607")
+PASSWORD = os.getenv("GB_PASSWORD", "958752607r")
 VELA_MINIMA = 2.0
 VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
@@ -28,12 +31,10 @@ ULTIMO_MULT = None
 ULTIMO_ENVIO = None
 CONTADOR = 0
 
-# === Comando /start ===
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.reply("🤖 Bot Aviator está online e monitorando as velas em tempo real!")
 
-# === Funções principais ===
 def prever_proxima_entrada(ultimas):
     if len(ultimas) < 2:
         return False, 0
@@ -42,10 +43,25 @@ def prever_proxima_entrada(ultimas):
         return True, min(chance, 99.9)
     return False, 0
 
+async def login(session):
+    payload = {
+        "account": USERNAME,
+        "password": PASSWORD
+    }
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    async with session.post(LOGIN_URL, data=payload, headers=headers) as resp:
+        if resp.status == 200:
+            print("[LOGIN] Sucesso no login GoldenBet.")
+        else:
+            print(f"[LOGIN ERRO] Código {resp.status}")
+        return session
+
 async def obter_html(session):
-    async with session.get(URL, timeout=10) as resp:
+    async with session.get(GAME_URL, timeout=10) as resp:
         html = await resp.text()
-        print("[HTML RAW]", html[:300])  # Exibe os primeiros 300 caracteres
+        print("[HTML RAW]", html[:300])
         return html
 
 def extrair_velas(html):
@@ -109,12 +125,13 @@ async def enviar_grafico():
 async def iniciar_scraping():
     global VELAS, ULTIMO_MULT, ULTIMO_ENVIO, CONTADOR
     async with aiohttp.ClientSession() as session:
+        await login(session)
         while True:
             try:
                 html = await obter_html(session)
                 velas = extrair_velas(html)
                 if not velas:
-                    print("[WARN] Nenhuma vela extraída, aguardando próximo ciclo...")
+                    print("[WARN] Nenhuma vela extraída.")
                     await asyncio.sleep(10)
                     continue
 
@@ -153,16 +170,14 @@ async def iniciar_scraping():
                         await enviar_sinal(sinal)
                         ULTIMO_ENVIO = sinal
                         CONTADOR += 1
-
                         if CONTADOR % 10 == 0:
                             await enviar_grafico()
                 else:
-                    print("[DEBUG] Nenhuma nova vela para enviar.")
+                    print("[DEBUG] Nenhuma nova vela detectada.")
             except Exception as e:
                 print(f"[ERRO SCRAPER] {e}")
             await asyncio.sleep(10)
 
-# === Inicializador principal ===
 async def main():
     await asyncio.gather(
         dp.start_polling(bot),
