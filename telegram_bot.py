@@ -1,42 +1,33 @@
-import asyncio
-import random
-import logging
-from datetime import datetime
-import os
-from telegram import Bot
+import requests
 
-# Token e Chat ID fixos
-TELEGRAM_BOT_TOKEN = "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
-TELEGRAM_CHAT_ID = "8101413562"
-TELEGRAM_GRUPO_ID = os.getenv("-1002769928832")
+# --- Configuração ---
+TOKEN = "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
+PRIVATE_CHAT_ID = 8101413562
+GROUP_CHAT_ID = int(os.getenv("GRUPO_ID", "-1002769928832"))  # fallback caso variável não esteja setada
 
-logging.basicConfig(level=logging.INFO)
+# ✅ Ativar ou desativar modo de teste
+modo_teste = True
 
-# Simula leitura de velas
-def gerar_velas_falsas():
-    return [round(random.uniform(0.5, 5.0), 2) for _ in range(20)]
 
-# Envio de sinal
-async def enviar_sinal(bot, velas):
-    agora = datetime.now().strftime("%H:%M:%S")
-    texto = f"""
-📡 SINAL DE TESTE ENVIADO!
-🕒 Horário: {agora}
-📊 Últimas velas: {velas[-5:]}
-🎯 Aposta recomendada: Próxima rodada!
-✅ Probabilidade: 99%
-"""
-    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=texto)
-    logging.info("[TESTE] Sinal enviado ao chat pessoal")
+def send_message(text, chat_id):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    try:
+        response = requests.post(url, data=payload)
+        response.raise_for_status()
+        print(f"Mensagem enviada para {chat_id}: {text}")
+    except Exception as e:
+        print(f"Erro ao enviar mensagem: {e}")
 
-# Loop principal
-async def main():
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    while True:
-        velas = gerar_velas_falsas()
-        logging.info(f"[TESTE] Velas simuladas: {velas[-5:]}")
-        await enviar_sinal(bot, velas)
-        await asyncio.sleep(10)  # Teste: 1 sinal a cada 10 segundos
+
+def executar_teste_envio():
+    print("🔍 Executando testes de envio...")
+    send_message("✅ <b>Teste de envio privado</b> realizado com sucesso!", PRIVATE_CHAT_ID)
+    send_message("📢 <b>Teste de envio no grupo VOO MILIONÁRIO</b> realizado com sucesso!", GROUP_CHAT_ID)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if modo_teste:
+        executar_teste_envio()
+    else:
+        print("⚙️ Bot em modo produção (sem testes)")
