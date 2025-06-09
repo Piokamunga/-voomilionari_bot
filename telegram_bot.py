@@ -181,4 +181,12 @@ async def main():
     )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(enviar_sinal({
+        "jogo": "Aviator",
+        "multiplicador": "2.50",
+        "hora": datetime.now(LUANDA_TZ).strftime("%H:%M:%S"),
+        "timestamp": datetime.now().isoformat(),
+        "tipo": "🔥 Alta (≥2x)",
+        "previsao": "91.0%",
+        "mensagem": "🚀 <b>Teste de envio manual</b>\n🎯 Verificando funcionamento do bot."
+    }))
