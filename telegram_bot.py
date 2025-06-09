@@ -12,10 +12,9 @@ from aiogram.types import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 # === Configurações ===
-
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
-GRUPO_ID = os.getenv("TELEGRAM_GRUPO_ID", "-1002520564793")
+TOKEN = "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
+CHAT_ID = "8101413562"
+GRUPO_ID = "-1002520564793"
 
 LOGIN_URL = "https://m.goldenbet.ao/index/login"
 GAME_URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
@@ -63,7 +62,7 @@ async def login(session):
             print("[LOGIN] Sucesso no login GoldenBet.")
         else:
             print(f"[LOGIN ERRO] Código {resp.status}")
-    return session
+        return session
 
 # === Captura da página do jogo ===
 async def obter_html(session):
@@ -121,7 +120,7 @@ def gerar_grafico_acertos(velas):
     plt.close()
     print("[INFO] Gráfico gerado e salvo em static/chart.png")
 
-# === Envio do gráfico para os chats ===
+# === Envio do gráfico ===
 async def enviar_grafico():
     try:
         gerar_grafico_acertos(VELAS)
@@ -139,7 +138,7 @@ async def enviar_grafico():
     except Exception as e:
         print(f"[ERRO GRAFICO] {e}")
 
-# === Loop de scraping e envio de sinais ===
+# === Loop principal de scraping e envio ===
 async def iniciar_scraping():
     global VELAS, ULTIMO_MULT, ULTIMO_ENVIO, CONTADOR
     async with aiohttp.ClientSession() as session:
