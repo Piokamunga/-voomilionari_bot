@@ -25,7 +25,7 @@ pip install aiogram
 
 3. Configure o token da API do bot e o chat ID no arquivo `main.py` (já configurados neste exemplo):
 ```python
-API_TOKEN = '7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38'
+API_TOKEN = '7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4'
 CHAT_ID = '8101413562'
 ```
 
