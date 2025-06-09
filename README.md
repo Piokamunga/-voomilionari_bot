@@ -14,7 +14,7 @@ Bot de Telegram para envio automático de sinais baseados em dados reais simulad
 
 1. Clone este repositório:
 ```bash
-git clone https://github.com/SEU_USUARIO/voomilionario_bot.git
+git clone https://github.com/piokamunga/voomilionario_bot.git
 cd voomilionario_bot
 ```
 
