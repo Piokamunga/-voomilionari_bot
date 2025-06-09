@@ -12,13 +12,17 @@ from aiogram.types import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 
 # === Configurações ===
+
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7585234067:AAGNX-k10l5MuQ7nbMirlsls5jugil16V38")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "8101413562")
 GRUPO_ID = os.getenv("TELEGRAM_GRUPO_ID", "-1002520564793")
+
 LOGIN_URL = "https://m.goldenbet.ao/index/login"
 GAME_URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+
 USERNAME = os.getenv("GB_USERNAME", "958752607")
 PASSWORD = os.getenv("GB_PASSWORD", "958752607r")
+
 VELA_MINIMA = 2.0
 VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
@@ -31,10 +35,12 @@ ULTIMO_MULT = None
 ULTIMO_ENVIO = None
 CONTADOR = 0
 
+# === Comando inicial ===
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.reply("🤖 Bot Aviator está online e monitorando as velas em tempo real!")
 
+# === Lógica de previsão ===
 def prever_proxima_entrada(ultimas):
     if len(ultimas) < 2:
         return False, 0
@@ -43,6 +49,7 @@ def prever_proxima_entrada(ultimas):
         return True, min(chance, 99.9)
     return False, 0
 
+# === Login automático na GoldenBet ===
 async def login(session):
     payload = {
         "account": USERNAME,
@@ -56,14 +63,21 @@ async def login(session):
             print("[LOGIN] Sucesso no login GoldenBet.")
         else:
             print(f"[LOGIN ERRO] Código {resp.status}")
-        return session
+    return session
 
+# === Captura da página do jogo ===
 async def obter_html(session):
-    async with session.get(GAME_URL, timeout=10) as resp:
-        html = await resp.text()
-        print("[HTML RAW]", html[:300])
-        return html
+    try:
+        await login(session)
+        async with session.get(GAME_URL, timeout=10) as resp:
+            html = await resp.text()
+            print("[HTML RAW]", html[:300])
+            return html
+    except Exception as e:
+        print(f"[ERRO LOGIN OU HTML] {e}")
+        return ""
 
+# === Extração dos valores das velas ===
 def extrair_velas(html):
     padrao = r'<div class="result-item[^"]*">([^<]+)</div>'
     valores = re.findall(padrao, html)
@@ -71,6 +85,7 @@ def extrair_velas(html):
     print(f"[VELAS EXTRAÍDAS] {velas_extraidas}")
     return velas_extraidas
 
+# === Envio de sinal para Telegram ===
 async def enviar_sinal(sinal):
     texto = (
         "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
@@ -91,6 +106,7 @@ async def enviar_sinal(sinal):
     except Exception as e:
         print(f"[ERRO ENVIO] {e}")
 
+# === Geração do gráfico de acertos ===
 def gerar_grafico_acertos(velas):
     acertos = [1 if v >= VELA_MINIMA else 0 for v in velas]
     plt.figure(figsize=(10, 3))
@@ -105,6 +121,7 @@ def gerar_grafico_acertos(velas):
     plt.close()
     print("[INFO] Gráfico gerado e salvo em static/chart.png")
 
+# === Envio do gráfico para os chats ===
 async def enviar_grafico():
     try:
         gerar_grafico_acertos(VELAS)
@@ -122,10 +139,10 @@ async def enviar_grafico():
     except Exception as e:
         print(f"[ERRO GRAFICO] {e}")
 
+# === Loop de scraping e envio de sinais ===
 async def iniciar_scraping():
     global VELAS, ULTIMO_MULT, ULTIMO_ENVIO, CONTADOR
     async with aiohttp.ClientSession() as session:
-        await login(session)
         while True:
             try:
                 html = await obter_html(session)
@@ -178,6 +195,7 @@ async def iniciar_scraping():
                 print(f"[ERRO SCRAPER] {e}")
             await asyncio.sleep(10)
 
+# === Inicialização ===
 async def main():
     await asyncio.gather(
         dp.start_polling(bot),
