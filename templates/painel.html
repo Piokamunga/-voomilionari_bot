@@ -1,19 +1,35 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt">
 <head>
-    <title>Painel de Sinais</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <title>Painel Voo Milionário</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>📡 Sinais Detectados</h1>
-    <div class="sinais">
-        {% for sinal in sinais %}
-            <div class="sinal">
-                <span class="tipo">{{ sinal.tipo }}</span>
-                <span class="valor">{{ sinal.valor }}x</span>
-                <span class="hora">{{ sinal.timestamp }}</span>
-            </div>
-        {% endfor %}
-    </div>
+  <header>
+    <img src="{{ banner_img }}" alt="Banner" style="max-width: 100%">
+    <h1>🚀 Painel Voo Milionário</h1>
+    <p><a href="{{ banner_link }}" target="_blank">Cadastre-se com bônus agora!</a></p>
+  </header>
+
+  <section>
+    <h2>📈 Últimos Sinais</h2>
+    <table>
+      <tr><th>Hora</th><th>Multiplicador</th><th>Tipo</th><th>Previsão</th></tr>
+      {% for sinal in sinais %}
+        <tr>
+          <td>{{ sinal.hora }}</td>
+          <td>{{ sinal.multiplicador }}x</td>
+          <td>{{ sinal.tipo }}</td>
+          <td>{{ sinal.previsao }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section>
+    <h2>📊 Gráfico de Desempenho</h2>
+    <img src="{{ chart_url }}" alt="Gráfico de acertos">
+  </section>
 </body>
-  </html>
+</html>
