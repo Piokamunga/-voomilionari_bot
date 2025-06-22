@@ -1,7 +1,6 @@
 import asyncio
 from aiohttp import web
-from telegrambotpy.py import iniciar_scraping
-
+from telegrambotpy import iniciar_scraping
 async def iniciar_servidor():
     async def handle(request):
         return web.Response(text="Bot Aviator rodando 24/7 no Render! 🚀")
