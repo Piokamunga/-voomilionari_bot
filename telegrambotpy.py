@@ -7,7 +7,8 @@ import pytz
 import matplotlib.pyplot as plt
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
-from aiogram.enums import ParseMode, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.enums import ParseMode
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 
