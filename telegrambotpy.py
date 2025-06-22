@@ -48,7 +48,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 VELAS = []
 ULTIMO_MULT = None
@@ -229,7 +229,7 @@ async def main():
         return
     try:
         asyncio.create_task(monitorar())
-        await dp.start_polling()
+        await dp.start_polling(bot)
     finally:
         limpar_instancia()
 
