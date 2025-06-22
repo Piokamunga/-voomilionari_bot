@@ -6,9 +6,13 @@ services:
     startCommand: python main.py
     plan: free
     envVars:
-      - key: TELEGRAM_BOT_TOKEN
+      - key: TG_BOT_TOKEN
         value: "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
-      - key: TELEGRAM_CHAT_ID
+      - key: CHAT_ID
         value: "8101413562"
-      - key: TELEGRAM_GRUPO_ID
+      - key: GRUPO_ID
         value: "-1002769928832"
+      - key: GB_USERNAME
+        value: "932071284"
+      - key: GB_PASSWORD
+        value: "932071284t"
