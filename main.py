@@ -1,6 +1,6 @@
 import asyncio
 from aiohttp import web
-from telegrambotpy import app
+from telegrambotpy.py import iniciar_scraping
 
 async def iniciar_servidor():
     async def handle(request):
