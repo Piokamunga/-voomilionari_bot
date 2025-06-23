@@ -6,10 +6,10 @@ import aiohttp
 import pytz
 import matplotlib.pyplot as plt
 from datetime import datetime
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.client.default import DefaultBotProperties
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+from aiogram.filters import Command
 from dotenv import load_dotenv
 
 # --- VARIÁVEIS DE AMBIENTE ---
@@ -19,12 +19,11 @@ load_dotenv()
 TOKEN = os.getenv("TG_BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID") or "8101413562"
 GRUPO_ID = os.getenv("GRUPO_ID") or "-1002769928832"
+USERNAME = os.getenv("GB_USERNAME")
+PASSWORD = os.getenv("GB_PASSWORD")
 
 LOGIN_URL = "https://m.goldenbet.ao/index/login"
 GAME_URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
-
-USERNAME = os.getenv("GB_USERNAME")
-PASSWORD = os.getenv("GB_PASSWORD")
 
 VELA_MINIMA = 2.0
 VELA_RARA = 100.0
@@ -43,19 +42,19 @@ MENSAGENS_MOTIVAS = [
 
 LOCK_FILE = ".bot_lock"
 LOG_DIR = "logs"
-
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs("static", exist_ok=True)
 
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher()
+router = Router()
+dp.include_router(router)
 
 VELAS = []
 ULTIMO_MULT = None
 ULTIMO_ENVIO_ID = None
 
 # --- FUNÇÕES AUXILIARES ---
-
 def checar_instancia():
     if os.path.exists(LOCK_FILE):
         print("⚠️ Bot já está em execução.")
@@ -68,7 +67,7 @@ def limpar_instancia():
     if os.path.exists(LOCK_FILE):
         os.remove(LOCK_FILE)
 
-def salvar_log_sinal(sinal: dict):
+def salvar_log_sinal(sinal):
     with open(f"{LOG_DIR}/sinais.jsonl", "a") as f:
         f.write(json.dumps(sinal, ensure_ascii=False) + "\n")
 
@@ -87,7 +86,7 @@ def extrair_velas(html):
     valores = re.findall(padrao, html)
     velas = []
     for v in valores:
-        v_clean = v.strip().lower().replace('x','')
+        v_clean = v.strip().lower().replace('x', '')
         try:
             velas.append(float(v_clean))
         except:
@@ -103,7 +102,6 @@ def prever_proxima_entrada(ultimas):
     return False, 0
 
 # --- REQUISIÇÕES E ENVIO ---
-
 async def login(session):
     try:
         payload = {"account": USERNAME, "password": PASSWORD}
@@ -143,7 +141,7 @@ async def enviar_sinal(sinal):
     )
 
     markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("🔗 Cadastre-se", url=banner_link)]
+        [InlineKeyboardButton(text="🔗 Cadastre-se", url=banner_link)]
     ])
 
     try:
@@ -157,26 +155,24 @@ async def enviar_grafico():
     try:
         gerar_grafico(VELAS)
         markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton("🔗 Cadastre-se", url=banner_link)]
+            [InlineKeyboardButton(text="🔗 Cadastre-se", url=banner_link)]
         ])
         for chat in [GRUPO_ID, CHAT_ID]:
-            await bot.send_photo(chat, photo=types.FSInputFile("static/chart.png"), caption="📈 <b>Últimos acertos registrados</b>", reply_markup=markup)
+            await bot.send_photo(chat, photo=FSInputFile("static/chart.png"), caption="📈 <b>Últimos acertos registrados</b>", reply_markup=markup)
         print("[GRÁFICO] Enviado com sucesso")
     except Exception as e:
         print(f"[ERRO GRAFICO] {e}")
 
 # --- HANDLERS ---
+@router.message(Command("start"))
+async def start_handler(message: Message):
+    await message.answer("🚀 Bot Voo Milionário está online e monitorando o Aviator em tempo real!")
 
-@dp.message_handler(commands=['start'])
-async def start_handler(message: types.Message):
-    await message.reply("🚀 Bot Voo Milionário está online e monitorando o Aviator em tempo real!")
-
-@dp.message_handler(commands=['grafico'])
-async def grafico_handler(message: types.Message):
+@router.message(Command("grafico"))
+async def grafico_handler(message: Message):
     await enviar_grafico()
 
 # --- MONITORAMENTO ---
-
 async def monitorar():
     global VELAS, ULTIMO_MULT
     async with aiohttp.ClientSession() as session:
@@ -202,7 +198,7 @@ async def monitorar():
                 timestamp = datetime.utcnow().isoformat()
                 prever, chance = prever_proxima_entrada(VELAS)
 
-                tipo = "🔥 Alta (≥2x)" if nova >= VELA_MINIMA else "🧊 Baixa (<2x)"
+                tipo = "🔥 Alta (≥2x)" if nova >= VELA_MINIMA else "🪈 Baixa (<2x)"
                 mensagem = None
 
                 if nova >= VELA_RARA:
@@ -222,9 +218,8 @@ async def monitorar():
 
             await asyncio.sleep(5)
 
-# --- INÍCIO DO BOT ---
-
-async def main():
+# --- INICIALIZAÇÃO ---
+async def iniciar_scraping():
     if not checar_instancia():
         return
     try:
@@ -234,4 +229,4 @@ async def main():
         limpar_instancia()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(iniciar_scraping())
