@@ -1,5 +1,6 @@
-import asyncio
+import asyncioAdd commentMore actions
 from aiohttp import web
+from telegrambotpy.py import iniciar_scraping
 from telegrambotpy import iniciar_scraping
 
 async def iniciar_servidor():
@@ -25,6 +26,3 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("⛔ Bot encerrado manualmente.")
-    except Exception as e:
-        print(f"[ERRO GERAL] {e}")
