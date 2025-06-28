@@ -321,4 +321,4 @@ async def iniciar_scraping():
         limpar_instancia()
 
 if __name__ == "__main__":
-    asyncio.run(iniciar_scraping())r
+    asyncio.run(iniciar_scraping())
