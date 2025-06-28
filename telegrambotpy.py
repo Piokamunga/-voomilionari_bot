@@ -1,4 +1,3 @@
-import asyncio
 import os
 import re
 import json
@@ -9,7 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, BotCommand
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
@@ -196,6 +195,58 @@ async def status_handler(message: Message):
     await message.answer(texto)
 
 # ============================================================
+# HANDLERS ADICIONAIS
+# ============================================================
+@router.message(Command("ajuda"))
+async def ajuda_handler(message: Message):
+    texto = (
+        "ℹ️ <b>Comandos disponíveis</b>
+"
+        "/start  — Inicia o bot
+"
+        "/ajuda  — Mostra esta ajuda
+"
+        "/grafico — Último gráfico de acertos
+"
+        "/sinais  — Lista dos últimos sinais
+"
+        "/painel  — Painel de status (em breve)
+"
+        "/sobre   — Sobre este projeto"
+    )
+    await message.answer(texto)
+
+@router.message(Command("sinais"))
+async def sinais_handler(message: Message):
+    try:
+        if not os.path.exists(f"{LOG_DIR}/sinais.jsonl"):
+            await message.answer("Nenhum sinal registrado ainda.")
+            return
+        with open(f"{LOG_DIR}/sinais.jsonl", "r", encoding="utf-8") as f:
+            linhas = f.readlines()[-5:]
+        if not linhas:
+            await message.answer("Nenhum sinal registrado ainda.")
+            return
+        mensagens = []
+        for linha in linhas:
+            dado = json.loads(linha)
+            mensagens.append(f"<b>{dado['hora']}</b> — {dado['multiplicador']}x ({dado['tipo']})")
+        await message.answer("📌 <b>Últimos sinais</b>:
+" + "
+".join(mensagens))
+    except Exception as e:
+        await message.answer("Erro ao buscar sinais.")
+        print("[ERRO SINAIS]", e)
+
+@router.message(Command("painel"))
+async def painel_handler(message: Message):
+    await message.answer("📊 Painel em construção. Fique ligado para novidades!")
+
+@router.message(Command("sobre"))
+async def sobre_handler(message: Message):
+    await message.answer("🤖 <b>Voo Milionário Bot</b> — Monitora o jogo Aviator 24/7 e envia sinais baseados em multiplicadores reais. Desenvolvido para fins educacionais.")
+
+# ============================================================
 # LOOP DE MONITORAMENTO
 # ============================================================
 async def monitorar():
@@ -248,12 +299,30 @@ async def monitorar():
                 await asyncio.sleep(10)
 
 # ============================================================
+# REGISTRAR COMANDOS DO BOT
+# ============================================================
+async def registrar_comandos():
+    comandos = [
+        ("start",  "Iniciar o bot"),
+        ("ajuda",  "Ver comandos"),
+        ("sinais", "Últimos sinais"),
+        ("grafico","Gráfico de acertos"),
+        ("painel", "Painel (em construção)"),
+        ("sobre",  "Sobre o projeto"),
+    ]
+    await bot.set_my_commands(
+        [BotCommand(command=c, description=d) for c, d in comandos]
+    )
+    print("[BOT] Comandos registrados!")
+
+# ============================================================
 # INICIALIZAÇÃO
 # ============================================================
 async def iniciar_scraping():
     if not checar_instancia():
         return
     try:
+        await registrar_comandos()
         asyncio.create_task(monitorar())
         await dp.start_polling(bot)
     finally:
