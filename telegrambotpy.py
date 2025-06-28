@@ -200,20 +200,14 @@ async def status_handler(message: Message):
 @router.message(Command("ajuda"))
 async def ajuda_handler(message: Message):
     texto = (
-        "ℹ️ <b>Comandos disponíveis</b>
-"
-        "/start  — Inicia o bot
-"
-        "/ajuda  — Mostra esta ajuda
-"
-        "/grafico — Último gráfico de acertos
-"
-        "/sinais  — Lista dos últimos sinais
-"
-        "/painel  — Painel de status (em breve)
-"
-        "/sobre   — Sobre este projeto"
-    )
+    "ℹ️ <b>Comandos disponíveis</b>\n"
+    "/start  — Inicia o bot\n"
+    "/ajuda  — Mostra esta ajuda\n"
+    "/grafico — Último gráfico de acertos\n"
+    "/sinais  — Lista dos últimos sinais\n"
+    "/painel  — Painel de status (em breve)\n"
+    "/sobre   — Sobre este projeto"
+        )
     await message.answer(texto)
 
 @router.message(Command("sinais"))
