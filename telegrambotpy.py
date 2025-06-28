@@ -225,8 +225,7 @@ async def sinais_handler(message: Message):
         for linha in linhas:
             dado = json.loads(linha)
             mensagens.append(f"<b>{dado['hora']}</b> — {dado['multiplicador']}x ({dado['tipo']})")
-        resposta = "📌 <b>Últimos sinais</b>:
-" + "
+        await message.answer("📌 <b>Últimos sinais</b>:\n" + "\n".join(mensagens))
     except Exception as e:
         await message.answer("Erro ao buscar sinais.")
         print("[ERRO SINAIS]", e)
