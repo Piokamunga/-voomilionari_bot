@@ -174,7 +174,8 @@ def obter_cookies_selenium() -> dict:
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+service = Service(ChromeDriverManager().install())
+driver = webdriver.Chrome(service=service, options=options)
     driver.get(LOGIN_URL)
     driver.implicitly_wait(5)
 
