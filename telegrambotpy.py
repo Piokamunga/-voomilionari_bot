@@ -330,19 +330,6 @@ async def registrar_comandos() -> None:
     ]
     await bot.set_my_commands([BotCommand(c, d) for c, d in cmds]
 
-# ============================================================
-# INICIALIZAÇÃO
-# ============================================================
-async def iniciar_scraping() -> None:
-    if not checar_instancia():
-        return
-    try:
-        await registrar_comandos()
-        asyncio.create_task(monitorar())
-        await dp.start_polling(bot)
-    finally:
-        limpar_instancia()
-
 # -------------------------
 # ENTRY-POINT
 # -------------------------
