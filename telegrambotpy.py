@@ -316,7 +316,7 @@ async def monitorar() -> None:
                 print("[ERRO MONITOR]", exc)
                 await asyncio.sleep(10)
 
-# ============================================================
+ ============================================================
 # REGISTRO DE COMANDOS
 # ============================================================
 async def registrar_comandos() -> None:
