@@ -316,20 +316,21 @@ async def monitorar() -> None:
                 print("[ERRO MONITOR]", exc)
                 await asyncio.sleep(10)
 
- ============================================================
-# REGISTRO DE COMANDOS
-# ============================================================
+# =========================================================
+# REGISTRAR COMANDOS
+# =========================================================
 async def registrar_comandos() -> None:
-    cmds = [
-        ("start",  "Iniciar"),
-        ("ajuda",  "Ajuda"),
-        ("sinais", "Últimos sinais"),
-        ("grafico","Gráfico"),
-        ("painel", "Painel"),
-        ("sobre",  "Sobre"),
+    comandos = [
+        BotCommand(command="start",   description="Iniciar"),
+        BotCommand(command="grafico", description="Gráfico de acertos"),
+        BotCommand(command="sinais",  description="Últimos sinais"),
+        BotCommand(command="status",  description="Status atual"),
+        BotCommand(command="ajuda",   description="Ver comandos disponíveis"),
+        BotCommand(command="sobre",   description="Sobre o projeto"),
     ]
-    await bot.set_my_commands([BotCommand(c, d) for c, d in cmds]
-
+    await bot.set_my_commands(comandos)
+    print("[BOT] Comandos registrados")
+    
 # -------------------------
 # ENTRY-POINT
 # -------------------------
