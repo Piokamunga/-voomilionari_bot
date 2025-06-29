@@ -331,17 +331,31 @@ async def registrar_comandos() -> None:
     await bot.set_my_commands(comandos)
     print("[BOT] Comandos registrados")
     
-# -------------------------
-# ENTRY-POINT
-# -------------------------
+# =========================================================
+# INICIALIZAÇÃO
+# =========================================================
+async def iniciar_scraping() -> None:
+    if not checar_instancia():
+        return
+    try:
+        await registrar_comandos()
+        asyncio.create_task(monitorar())
+        await dp.start_polling(bot)
+    finally:
+        limpar_instancia()
+
+
+# =========================================================
+# ENTRY POINT
+# =========================================================
 if __name__ == "__main__":
     asyncio.run(iniciar_scraping())
 
-    # Listener “fake” para Render (free tier) — evita erro de porta
+    # --- Work-around Render free tier (porta obrigatória) ---
     if os.getenv("RENDER"):
         port = int(os.getenv("PORT", 10000))
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("0.0.0.0", port))
             s.listen()
-            print(f"[RENDER] Fake listener ativo na porta {port}")
+            print(f"[RENDER] Escutando porta {port} (fake listener)")
             s.accept()
