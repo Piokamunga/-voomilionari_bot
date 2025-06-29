@@ -1,51 +1,46 @@
 """
 telegrambotpy.py — Voo Milionário Bot
-Monitora o Aviator 24/7 e envia sinais ≥ 1.99 x no Telegram.
-
-Requisitos:
-• Python ≥ 3.11  • aiogram 3.x
-• aiohttp • pytz • matplotlib
-• (.env) TG_BOT_TOKEN, GB_USERNAME, GB_PASSWORD
-Autor: Pio Ginga (2025)
+Monitora Aviator 24/7, envia sinais ≥1.99 x e gráfico automático.
+Autor: Pio Ginga • 2025
 """
 
-# =========================
-# IMPORTS
-# =========================
-import os
-import re
-import json
-import socket
-import asyncio
-import aiohttp
-import pytz
-import matplotlib.pyplot as plt
+# =============== IMPORTS ===============
+import os, re, json, socket, asyncio, aiohttp, pytz, matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from typing import List, Tuple
 from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, BotCommand
+from aiogram.types import (Message, InlineKeyboardMarkup, InlineKeyboardButton,
+                           FSInputFile, BotCommand)
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
+# ======================================
 
-# ============================================================
-# VARIÁVEIS DE AMBIENTE
-# ============================================================
+# ----------- .env variáveis -----------
 load_dotenv()
 TOKEN      = os.getenv("TG_BOT_TOKEN")
-CHAT_ID    = os.getenv("CHAT_ID")    or "8101413562"
-GRUPO_ID   = os.getenv("GRUPO_ID")   or "-1002769928832"
-USERNAME   = os.getenv("GB_USERNAME")
-PASSWORD   = os.getenv("GB_PASSWORD")
+CHAT_ID    = os.getenv("CHAT_ID", "8101413562")
+GRUPO_ID   = os.getenv("GRUPO_ID", "-1002769928832")
 
-LOGIN_URL  = "https://m.goldenbet.ao/index/login"
-GAME_URL   = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
+if not TOKEN:
+    raise RuntimeError("Defina TG_BOT_TOKEN no .env")
 
-VELA_MINIMA, VELA_RARA = 1.99, 100.0  # envia sinais >=1.99x
-LUANDA_TZ              = pytz.timezone("Africa/Luanda")
+GAME_URL = ("https://m.goldenbet.ao/gameGo?"
+            "id=1873916590817091585&code=2201&platform=PP")
 
-banner_link   = "https://bit.ly/449TH4F"
-banner_imagem = "https://i.ibb.co/ZcK9dcT/banner.png"
+VELA_MINIMA = 1.99
+VELA_RARA   = 100.0
+LUANDA_TZ   = pytz.timezone("Africa/Luanda")
+
+BANNER_LINK, BANNER_IMAGEM = (
+    "https://bit.ly/449TH4F",
+    "https://i.ibb.co/ZcK9dcT/banner.png",
+)
+
+LOCK_FILE, LOG_DIR, STATIC_DIR = ".bot_lock", "logs", "static"
+for pasta in (LOG_DIR, STATIC_DIR):
+    os.makedirs(pasta, exist_ok=True)
 
 MENSAGENS_MOTIVAS = [
     "💥 Hoje pode ser o dia da sua virada!",
@@ -55,102 +50,65 @@ MENSAGENS_MOTIVAS = [
     "🎲 O próximo voo pode ser o milionário!",
 ]
 
-LOCK_FILE, LOG_DIR = ".bot_lock", "logs"
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs("static", exist_ok=True)
-
-# ============================================================
-# INSTÂNCIAS DO BOT
-# ============================================================
+# ---- Bot instância & estado ----------
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp  = Dispatcher()
-router = Router()
+dp, router = Dispatcher(), Router()
 dp.include_router(router)
 
-VELAS: list[float] = []
+VELAS: List[float] = []
 ULTIMO_MULT: float | None = None
-ULTIMO_ENVIO_ID: str  | None = None
+ULTIMO_ENVIO_ID: str   | None = None
 
-# ============================================================
-# FUNÇÕES AUXILIARES
-# ============================================================
+GRAPH_INTERVAL_SEC = 300            # 300 s (5 min) — mude p/ ≥ 60 s se quiser
+ULTIMO_GRAFICO: datetime | None = None
+# ======================================
 
+# ============ FUNÇÕES AUX =============
 def checar_instancia() -> bool:
     if os.path.exists(LOCK_FILE):
-        print("⚠️ Bot já está em execução.")
-        return False
-    with open(LOCK_FILE, "w") as f:
-        f.write(str(datetime.utcnow()))
-    return True
+        print("⚠️ Bot já está em execução."); return False
+    open(LOCK_FILE, "w").write(datetime.utcnow().isoformat()); return True
 
-def limpar_instancia():
-    if os.path.exists(LOCK_FILE):
-        os.remove(LOCK_FILE)
+def limpar_instancia(): 
+    if os.path.exists(LOCK_FILE): os.remove(LOCK_FILE)
 
 def salvar_log_sinal(sinal: dict):
     with open(f"{LOG_DIR}/sinais.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(sinal, ensure_ascii=False) + "\n")
 
-def gerar_grafico(velas):
-    acertos = [1 if v >= VELA_MINIMA else 0 for v in velas]
-    plt.figure(figsize=(10, 3))
-    plt.plot(acertos, marker="o", linewidth=1)
-    plt.title("Acertos (≥1.99x)")
-    plt.grid(True, linestyle=":", linewidth=0.5)
-    plt.tight_layout()
-    plt.savefig("static/chart.png")
-    plt.close()
+def gerar_grafico():
+    acertos = [1 if v >= VELA_MINIMA else 0 for v in VELAS]
+    plt.figure(figsize=(10,3)); plt.plot(acertos, marker="o")
+    plt.grid(True, linestyle=":"); plt.title("Acertos (≥1.99x)")
+    plt.tight_layout(); plt.savefig(f"{STATIC_DIR}/chart.png"); plt.close()
 
-# Regex flexível: captura qualquer número (floats ou ints) seguido de x/X
 VELA_REGEX = re.compile(r"(\d+(?:\.\d+)?)[xX]")
+def extrair_velas(html:str) -> List[float]:
+    return [float(m.group(1)) for m in VELA_REGEX.finditer(html)]
 
-def extrair_velas(html: str):
-    return [float(match.group(1)) for match in VELA_REGEX.finditer(html)]
+def prever_proxima_entrada(seq)->Tuple[bool,float]:
+    if len(seq)<2: return False,0.0
+    if seq[-1]<2 and seq[-2]<2:
+        prob=90+round((2-seq[-1])*5+(2-seq[-2])*5,1)
+        return True,min(prob,99.9)
+    return False,0.0
+# ======================================
 
-def prever_proxima_entrada(ultimas):
-    if len(ultimas) < 2:
-        return False, 0
-    if ultimas[-1] < 2.0 and ultimas[-2] < 2.0:
-        chance = 90 + round((2.0 - ultimas[-1]) * 5 + (2.0 - ultimas[-2]) * 5, 1)
-        return True, min(chance, 99.9)
-    return False, 0
-
-# ============================================================
-# REQUISIÇÕES HTTP
-# ============================================================
-async def login(session: aiohttp.ClientSession):
+# -------------- HTTP ------------------
+async def obter_html(session:aiohttp.ClientSession)->str:
     try:
-        payload = {"account": USERNAME, "password": PASSWORD}
-        headers  = {"Content-Type": "application/x-www-form-urlencoded"}
-        async with session.post(LOGIN_URL, data=payload, headers=headers) as resp:
-            ok = resp.status == 200
-            print("[LOGIN]", "Sucesso" if ok else f"Falhou ({resp.status})")
-            return ok
+        async with session.get(GAME_URL, timeout=10) as r:
+            return await r.text()
     except Exception as e:
-        print("[LOGIN EXCEPTION]", e)
-        return False
+        print("[HTML ERR]",e); return ""
+# ======================================
 
-async def obter_html(session: aiohttp.ClientSession):
-    if not await login(session):
-        return ""
-    try:
-        async with session.get(GAME_URL, timeout=10) as resp:
-            html = await resp.text()
-            print("[HTML] len:", len(html))
-            return html if "login" not in html.lower() else ""
-    except Exception as e:
-        print("[ERRO HTML]", e)
-        return ""
-
-# ============================================================
-# ENVIO DE SINAL & GRÁFICO
-# ============================================================
-async def enviar_sinal(sinal: dict):
+# ------ ENVIO TELEGRAM ----------------
+async def enviar_sinal(sinal):
     global ULTIMO_ENVIO_ID
-    msg_id = f"{sinal['timestamp']}-{sinal['multiplicador']}"
-    if msg_id == ULTIMO_ENVIO_ID:
-        return
-    ULTIMO_ENVIO_ID = msg_id
+    mid=f"{sinal['timestamp']}-{sinal['multiplicador']}"
+    if mid==ULTIMO_ENVIO_ID: return
+    ULTIMO_ENVIO_ID=mid
 
     texto = (
         "🎰 <b>SINAL DETECTADO - AVIATOR</b>\n\n"
@@ -159,175 +117,90 @@ async def enviar_sinal(sinal: dict):
         f"📊 <b>Classificação:</b> {sinal['tipo']}\n"
         f"🔮 <b>Previsão:</b> {sinal['previsao']}\n\n"
         f"{sinal['mensagem'] or ''}\n\n"
-        f"💰 Cadastre-se com bônus:\n👉 <a href='{banner_link}'>{banner_link}</a>"
+        f"💰 Cadastre-se:\n👉 <a href='{BANNER_LINK}'>{BANNER_LINK}</a>"
     )
+    mk = InlineKeyboardMarkup([[InlineKeyboardButton("🔗 Cadastre-se", url=BANNER_LINK)]])
+    for dest in (GRUPO_ID, CHAT_ID):
+        try:
+            await bot.send_photo(dest, photo=BANNER_IMAGEM, caption=texto, reply_markup=mk)
+        except Exception as e:
+            print("[SEND ERR]",e)
 
-    markup = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🔗 Cadastre-se", url=banner_link)]]
-    )
-    try:
-        await bot.send_photo(GRUPO_ID, photo=banner_imagem, caption=texto, reply_markup=markup)
-        await bot.send_photo(CHAT_ID,  photo=banner_imagem, caption=texto, reply_markup=markup)
-        print(f"[SINAL] Enviado: {sinal['multiplicador']}x às {sinal['hora']}")
-    except Exception as e:
-        print("[ERRO ENVIO]", e)
+async def enviar_grafico_auto(forcado=False):
+    global ULTIMO_GRAFICO
+    agora=datetime.now(LUANDA_TZ)
+    if not forcado and ULTIMO_GRAFICO and (agora-ULTIMO_GRAFICO).total_seconds()<GRAPH_INTERVAL_SEC:
+        return
+    if not VELAS: return
+    ULTIMO_GRAFICO=agora; gerar_grafico()
+    mk=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 Cadastre-se",url=BANNER_LINK)]])
+    for dest in (GRUPO_ID,CHAT_ID):
+        try:
+            await bot.send_photo(dest, photo=FSInputFile(f"{STATIC_DIR}/chart.png"),
+                                 caption=f"📈 <b>Gráfico automático</b> — {agora.strftime('%d/%m %H:%M')}",
+                                 reply_markup=mk)
+        except Exception as e: print("[GRAF ERR]",e)
+# ======================================
 
-async def enviar_grafico():
-    try:
-        gerar_grafico(VELAS)
-        markup = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="🔗 Cadastre-se", url=banner_link)]]
-        )
-        for chat in [GRUPO_ID, CHAT_ID]:
-            await bot.send_photo(
-                chat,
-                photo=FSInputFile("static/chart.png"),
-                caption="📈 <b>Últimos acertos registrados</b>",
-                reply_markup=markup,
-            )
-        print("[GRÁFICO] Enviado com sucesso")
-    except Exception as e:
-        print("[ERRO GRAFICO]", e)
-
-# ============================================================
-# HANDLERS TELEGRAM
-# ============================================================
-@router.message(Command("start"))
-async def start_handler(message: Message):
-    await message.answer("🚀 Bot Voo Milionário está online e monitorando o Aviator em tempo real!\nUse /grafico para ver o desempenho.")
-
-@router.message(Command("grafico"))
-async def grafico_handler(message: Message):
-    await enviar_grafico()
-
-@router.message(Command("status"))
-async def status_handler(message: Message):
-    texto = (
-        f"📊 VELAS armazenadas: {len(VELAS)}\n"
-        f"🔄 Último mult: {ULTIMO_MULT}\n"
-        f"💾 Último envio: {ULTIMO_ENVIO_ID}"
-    )
-    await message.answer(texto)
-
-# ============================================================
-# HANDLERS ADICIONAIS
-# ============================================================
-@router.message(Command("ajuda"))
-async def ajuda_handler(message: Message):
-    texto = (
-    "ℹ️ <b>Comandos disponíveis</b>\n"
-    "/start  — Inicia o bot\n"
-    "/ajuda  — Mostra esta ajuda\n"
-    "/grafico — Último gráfico de acertos\n"
-    "/sinais  — Lista dos últimos sinais\n"
-    "/painel  — Painel de status (em breve)\n"
-    "/sobre   — Sobre este projeto"
-        )
-    await message.answer(texto)
+# ------------- HANDLERS ---------------
+@router.message(Command("start"))  async def _start(m:Message): await m.answer("🚀 Bot Voo Milionário online! /ajuda")
+@router.message(Command("ajuda"))  async def _help(m:Message):  await m.answer("Comandos: /start /ajuda /grafico /sinais /status /painel /sobre")
+@router.message(Command("grafico"))async def _graf(m:Message):  await enviar_grafico_auto(forcado=True)
 
 @router.message(Command("sinais"))
-async def sinais_handler(message: Message):
-    try:
-        if not os.path.exists(f"{LOG_DIR}/sinais.jsonl"):
-            await message.answer("Nenhum sinal registrado ainda.")
-            return
-        with open(f"{LOG_DIR}/sinais.jsonl", "r", encoding="utf-8") as f:
-            linhas = f.readlines()[-5:]
-        if not linhas:
-            await message.answer("Nenhum sinal registrado ainda.")
-            return
-        mensagens = []
-        for linha in linhas:
-            dado = json.loads(linha)
-            mensagens.append(f"<b>{dado['hora']}</b> — {dado['multiplicador']}x ({dado['tipo']})")
-        await message.answer("📌 <b>Últimos sinais</b>:\n" + "\n".join(mensagens))
-    except Exception as e:
-        await message.answer("Erro ao buscar sinais.")
-        print("[ERRO SINAIS]", e)
+async def _sig(m:Message):
+    arq=f"{LOG_DIR}/sinais.jsonl"
+    if not os.path.exists(arq): await m.answer("Nenhum sinal."); return
+    linhas=open(arq,encoding="utf-8").read().strip().splitlines()[-5:]
+    if not linhas: await m.answer("Nenhum sinal."); return
+    resp="\n".join(f"<b>{json.loads(l)['hora']}</b> — {json.loads(l)['multiplicador']}x" for l in linhas)
+    await m.answer("📌 <b>Últimos sinais</b>:\n"+resp)
 
-@router.message(Command("painel"))
-async def painel_handler(message: Message):
-    await message.answer("📊 Painel em construção. Fique ligado para novidades!")
+@router.message(Command("status"))
+async def _status(m:Message):
+    await m.answer(f"VELAS: {len(VELAS)} • Último mult: {ULTIMO_MULT} • Último gráfico: {ULTIMO_GRAFICO}")
 
-@router.message(Command("sobre"))
-async def sobre_handler(message: Message):
-    await message.answer("🤖 <b>Voo Milionário Bot</b> — Monitora o jogo Aviator 24/7 e envia sinais baseados em multiplicadores reais. Desenvolvido para fins educacionais.")
+@router.message(Command("painel")) async def _pan(m:Message): await m.answer("📊 Painel em construção.")
+@router.message(Command("sobre"))  async def _sob(m:Message): await m.answer("🤖 Voo Milionário Bot — by Pio.")
 
-# ============================================================
-# LOOP DE MONITORAMENTO
-# ============================================================
+# --------------- LOOP -----------------
 async def monitorar():
-    global VELAS, ULTIMO_MULT
-    async with aiohttp.ClientSession() as session:
+    global ULTIMO_MULT
+    async with aiohttp.ClientSession() as sess:
         while True:
             try:
-                html = await obter_html(session)
-                if not html:
-                    await asyncio.sleep(10)
-                    continue
-
-                velas_atual = extrair_velas(html)
-                if not velas_atual:
-                    await asyncio.sleep(10)
-                    continue
-
-                nova = velas_atual[-1]
-                if nova != ULTIMO_MULT:
-                    VELAS.append(nova)
-                    if len(VELAS) > 20:
-                        VELAS.pop(0)
-                    ULTIMO_MULT = nova
-
-                    hora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
-                    timestamp = datetime.utcnow().isoformat()
-                    prever, chance = prever_proxima_entrada(VELAS)
-
-                    tipo = "🔥 Alta (≥1.99x)" if nova >= VELA_MINIMA else "🢨 Baixa (<1.99x)"
-                    mensagem = None
-                    if nova >= VELA_RARA:
-                        tipo = "🚀 Rara (>100x)"
-                        mensagem = MENSAGENS_MOTIVAS[datetime.now().second % len(MENSAGENS_MOTIVAS)]
-
-                    sinal = {
-                        "hora": hora,
-                        "multiplicador": nova,
-                        "tipo": tipo,
-                        "previsao": f"{chance}%" if prever else "Sem sinal",
-                        "mensagem": mensagem,
-                        "timestamp": timestamp,
-                    }
-                    salvar_log_sinal(sinal)
-                    await enviar_sinal(sinal)
-
+                html=await obter_html(sess)
+                if not html: await asyncio.sleep(10); continue
+                velas=extrair_velas(html)
+                if not velas: await asyncio.sleep(10); continue
+                nova=velas[-1]
+                if nova!=ULTIMO_MULT:
+                    VELAS.append(nova); VELAS=VELAS[-20:]; ULTIMO_MULT=nova
+                    hora=datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
+                    prever,chance=prever_proxima_entrada(VELAS)
+                    tipo="🔥 Alta (≥1.99x)" if nova>=VELA_MINIMA else "🢨 Baixa (<1.99x)"
+                    msg=None
+                    if nova>=VELA_RARA:
+                        tipo="🚀 Rara (>100x)"
+                        msg=MENSAGENS_MOTIVAS[int(datetime.now().timestamp())%len(MENSAGENS_MOTIVAS)]
+                    sinal={"hora":hora,"multiplicador":nova,"tipo":tipo,
+                           "previsao":f"{chance}%" if prever else "Sem sinal",
+                           "mensagem":msg,"timestamp":datetime.utcnow().isoformat()}
+                    salvar_log_sinal(sinal); await enviar_sinal(sinal)
+                await enviar_grafico_auto()
                 await asyncio.sleep(5)
-
             except Exception as e:
-                print("[ERRO LOOP MONITORAMENTO]", e)
-                await asyncio.sleep(10)
+                print("[LOOP ERR]",e); await asyncio.sleep(10)
 
-# ============================================================
-# REGISTRAR COMANDOS DO BOT
-# ============================================================
+# ---------- COMANDOS BOT -------------
 async def registrar_comandos():
-    comandos = [
-        ("start",  "Iniciar o bot"),
-        ("ajuda",  "Ver comandos"),
-        ("sinais", "Últimos sinais"),
-        ("grafico","Gráfico de acertos"),
-        ("painel", "Painel (em construção)"),
-        ("sobre",  "Sobre o projeto"),
-    ]
-    await bot.set_my_commands(
-        [BotCommand(command=c, description=d) for c, d in comandos]
-    )
-    print("[BOT] Comandos registrados!")
+    cmds=[("start","Iniciar"),("ajuda","Ajuda"),("sinais","Últimos"),("grafico","Gráfico"),
+          ("status","Status"),("painel","Painel"),("sobre","Sobre")]
+    await bot.set_my_commands([BotCommand(c,d) for c,d in cmds])
 
-# ============================================================
-# INICIALIZAÇÃO
-# ============================================================
+# --------------- MAIN ----------------
 async def iniciar_scraping():
-    if not checar_instancia():
-        return
+    if not checar_instancia(): return
     try:
         await registrar_comandos()
         asyncio.create_task(monitorar())
@@ -335,17 +208,11 @@ async def iniciar_scraping():
     finally:
         limpar_instancia()
 
-# -------------------------
-# ENTRADA PRINCIPAL
-# -------------------------
-if __name__ == "__main__":
+if __name__=="__main__":
     asyncio.run(iniciar_scraping())
-
-    # --- Workaround Render free tier (porta obrigatória) ---
+    # Porta fake p/ Render free
     if os.getenv("RENDER"):
-        port = int(os.getenv("PORT", 10000))
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("0.0.0.0", port))
-            s.listen()
-            print(f"[RENDER] Escutando porta {port} (fake listener)")
-            s.accept()
+        port=int(os.getenv("PORT",10000))
+        with socket.socket() as s:
+            s.bind(("0.0.0.0",port)); s.listen()
+            print(f"[RENDER] Escutando porta {port} (fake)"); s.accept()
