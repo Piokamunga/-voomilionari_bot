@@ -1,13 +1,16 @@
-"""telegrambotpy.py – Voo Milionário Bot
+"""
+telegrambotpy.py – Voo Milionário Bot
+
 Monitora o jogo Aviator 24/7 e envia sinais no Telegram quando identifica
 multiplicadores iguais ou superiores a 1.99x.
 
 Requisitos principais:
-- Python ≥ 3.11
-- aiogram 3.x
-- aiohttp, pytz, matplotlib
-- selenium, webdriver‑manager
-- Chrome ou Chromium instalado (para Selenium headless)
+
+Python ≥ 3.11  
+aiogram 3.x  
+aiohttp, pytz, matplotlib  
+selenium, webdriver-manager  
+Chrome ou Chromium instalado (para Selenium headless)
 
 Autor: Pio Ginga (2025)
 """
@@ -33,6 +36,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from aiogram import Bot, Dispatcher, Router
 from aiogram.enums import ParseMode
@@ -64,19 +68,18 @@ if not all([TOKEN, USERNAME, PASSWORD]):
 LOGIN_URL = "https://m.goldenbet.ao/index/login"
 GAME_URL = "https://m.goldenbet.ao/gameGo?id=1873916590817091585&code=2201&platform=PP"
 
-VELA_MINIMA = 1.99  # Sinais enviados quando multiplicador ≥ VELA_MINIMA
-VELA_RARA = 100.0   # Multiplicador considerado raro (exibe mensagem motivacional)
+VELA_MINIMA = 1.99
+VELA_RARA = 100.0
 LUANDA_TZ = pytz.timezone("Africa/Luanda")
 
 BANNER_LINK = "https://bit.ly/449TH4F"
 BANNER_IMAGEM = "https://i.ibb.co/ZcK9dcT/banner.png"
 
-COOKIE_FILE = "cookies_gb.json"  # Persistência de cookies da GoldenBet
+COOKIE_FILE = "cookies_gb.json"
 LOCK_FILE = ".bot_lock"
 LOG_DIR = "logs"
 STATIC_DIR = "static"
 
-# Cria diretórios necessários
 for pasta in (LOG_DIR, STATIC_DIR):
     os.makedirs(pasta, exist_ok=True)
 
@@ -97,7 +100,6 @@ dp = Dispatcher()
 router = Router()
 dp.include_router(router)
 
-# Estado em memória
 VELAS: List[float] = []
 ULTIMO_MULT: float | None = None
 ULTIMO_ENVIO_ID: str | None = None
@@ -107,26 +109,18 @@ ULTIMO_ENVIO_ID: str | None = None
 # ==========================
 
 def checar_instancia() -> bool:
-    """Evita instâncias múltiplas criando um arquivo‑cadeado."""
     if pathlib.Path(LOCK_FILE).exists():
         print("⚠️ Bot já está em execução.")
         return False
     pathlib.Path(LOCK_FILE).write_text(datetime.utcnow().isoformat())
     return True
 
-
 def limpar_instancia() -> None:
     pathlib.Path(LOCK_FILE).unlink(missing_ok=True)
-
 
 def salvar_log_sinal(sinal: dict) -> None:
     with open(f"{LOG_DIR}/sinais.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(sinal, ensure_ascii=False) + "\n")
-
-
-# --------------------------
-# Geração de gráfico
-# --------------------------
 
 def gerar_grafico(velas: List[float]) -> None:
     acertos = [1 if v >= VELA_MINIMA else 0 for v in velas]
@@ -138,17 +132,10 @@ def gerar_grafico(velas: List[float]) -> None:
     plt.savefig(f"{STATIC_DIR}/chart.png")
     plt.close()
 
-
-# --------------------------
-# Regex flexível: captura qualquer número seguido de x/X
-# --------------------------
-
 VELA_REGEX = re.compile(r"(\d+(?:\.\d+)?)[xX]")
-
 
 def extrair_velas(html: str) -> List[float]:
     return [float(m.group(1)) for m in VELA_REGEX.finditer(html)]
-
 
 def prever_proxima_entrada(ultimas: List[float]) -> Tuple[bool, float]:
     if len(ultimas) < 2:
@@ -163,8 +150,6 @@ def prever_proxima_entrada(ultimas: List[float]) -> Tuple[bool, float]:
 # ==========================
 
 def obter_cookies_selenium() -> dict:
-    """Efetua login headless na GoldenBet e devolve cookies válidos."""
-    # Reutiliza cookies persistidos se existirem
     if pathlib.Path(COOKIE_FILE).exists():
         with open(COOKIE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -174,8 +159,8 @@ def obter_cookies_selenium() -> dict:
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
     driver.get(LOGIN_URL)
     driver.implicitly_wait(5)
 
@@ -190,18 +175,15 @@ driver = webdriver.Chrome(service=service, options=options)
     cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
     driver.quit()
 
-    # Persiste cookies
     with open(COOKIE_FILE, "w", encoding="utf-8") as f:
         json.dump(cookies, f)
 
     return cookies
 
-
-# Cookies de sessão GoldenBet
 GB_COOKIES = obter_cookies_selenium()
 
 # ==========================
-# REQUISIÇÕES HTTP (aiohttp)
+# REQUISIÇÕES HTTP
 # ==========================
 
 async def login(session: aiohttp.ClientSession) -> bool:
@@ -216,16 +198,14 @@ async def login(session: aiohttp.ClientSession) -> bool:
         print("[LOGIN EXCEPTION]", exc)
         return False
 
-
 async def obter_html(session: aiohttp.ClientSession) -> str:
-    """Obtém o HTML do jogo; faz login se necessário."""
     try:
         async with session.get(GAME_URL, timeout=10) as resp:
             html = await resp.text()
             if "login" in html.lower():
                 print("[HTML] Sessão expirada – realizando novo login…")
                 if await login(session):
-                    return await obter_html(session)  # tentativa recursiva
+                    return await obter_html(session)
                 return ""
             print("[HTML] len:", len(html))
             return html
@@ -238,13 +218,10 @@ async def obter_html(session: aiohttp.ClientSession) -> str:
 # ==========================
 
 async def enviar_sinal(sinal: dict) -> None:
-    """Envia um sinal (mensagem + banner) para o grupo e chat de administração."""
     global ULTIMO_ENVIO_ID
-
     msg_id = f"{sinal['timestamp']}-{sinal['multiplicador']}"
     if msg_id == ULTIMO_ENVIO_ID:
-        return  # evita duplicidades
-
+        return
     ULTIMO_ENVIO_ID = msg_id
 
     texto = (
@@ -268,7 +245,6 @@ async def enviar_sinal(sinal: dict) -> None:
     except Exception as exc:
         print("[ERRO ENVIO]", exc)
 
-
 async def enviar_grafico() -> None:
     try:
         gerar_grafico(VELAS)
@@ -287,7 +263,7 @@ async def enviar_grafico() -> None:
         print("[ERRO GRÁFICO]", exc)
 
 # ==========================
-# HANDLERS TELEGRAM (comandos)
+# HANDLERS TELEGRAM
 # ==========================
 
 @router.message(Command("start"))
@@ -296,11 +272,9 @@ async def start_handler(message: Message) -> None:
         "🚀 Bot Voo Milionário está online e monitorando o Aviator em tempo real!\nUse /grafico para ver o desempenho."
     )
 
-
 @router.message(Command("grafico"))
 async def grafico_handler(message: Message) -> None:
     await enviar_grafico()
-
 
 @router.message(Command("status"))
 async def status_handler(message: Message) -> None:
@@ -310,11 +284,6 @@ async def status_handler(message: Message) -> None:
         f"💾 Último envio: {ULTIMO_ENVIO_ID}"
     )
     await message.answer(texto)
-
-
-# --------------------------
-# HANDLERS ADICIONAIS
-# --------------------------
 
 @router.message(Command("ajuda"))
 async def ajuda_handler(message: Message) -> None:
@@ -328,7 +297,6 @@ async def ajuda_handler(message: Message) -> None:
         "/sobre   — Sobre este projeto"
     )
     await message.answer(texto)
-
 
 @router.message(Command("sinais"))
 async def sinais_handler(message: Message) -> None:
@@ -354,11 +322,9 @@ async def sinais_handler(message: Message) -> None:
         await message.answer("Erro ao buscar sinais.")
         print("[ERRO SINAIS]", exc)
 
-
 @router.message(Command("painel"))
 async def painel_handler(message: Message) -> None:
     await message.answer("📊 Painel em construção. Fique ligado para novidades!")
-
 
 @router.message(Command("sobre"))
 async def sobre_handler(message: Message) -> None:
@@ -389,7 +355,7 @@ async def monitorar() -> None:
                 nova = velas_atual[-1]
                 if nova != ULTIMO_MULT:
                     VELAS.append(nova)
-                    VELAS = VELAS[-20:]  # mantém histórico de 20
+                    VELAS = VELAS[-20:]
                     ULTIMO_MULT = nova
 
                     hora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
@@ -421,7 +387,7 @@ async def monitorar() -> None:
                 await asyncio.sleep(10)
 
 # ==========================
-# REGISTRAR COMANDOS DO BOT
+# REGISTRAR COMANDOS
 # ==========================
 
 async def registrar_comandos() -> None:
@@ -443,14 +409,12 @@ async def registrar_comandos() -> None:
 async def iniciar_scraping() -> None:
     if not checar_instancia():
         return
-
     try:
         await registrar_comandos()
         asyncio.create_task(monitorar())
         await dp.start_polling(bot)
     finally:
         limpar_instancia()
-
 
 if __name__ == "__main__":
     asyncio.run(iniciar_scraping())
