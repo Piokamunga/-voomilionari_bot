@@ -328,7 +328,7 @@ async def registrar_comandos() -> None:
         ("painel", "Painel"),
         ("sobre",  "Sobre"),
     ]
-    await bot.set_my_commands([BotCommand(c, d) for c, d in cmds])
+    await bot.set_my_commands([BotCommand(c, d) for c, d in cmds]
 
 # ============================================================
 # INICIALIZAÇÃO
