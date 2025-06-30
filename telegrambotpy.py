@@ -348,7 +348,7 @@ async def registrar_comandos() -> None:
         BotCommand("ajuda",   "Ajuda"),
         BotCommand("sobre",   "Sobre o projeto"),
     ])
-    print("[BOT] Comandos registrados")
+    print("[BOT] Comandos registrados"
 
 # ╭───────────────────────────── startup ────────────────────────────────╮
 async def iniciar_scraping() -> None:
