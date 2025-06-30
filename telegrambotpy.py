@@ -338,17 +338,20 @@ async def monitorar() -> None:
                 print("[ERRO MONITOR]", exc)
                 await asyncio.sleep(10)
 
-# ╭─────────────────────────── setup comandos ───────────────────────────╮
+# ──────────────────────────────────
+# Registrar comandos
+# ──────────────────────────────────
 async def registrar_comandos() -> None:
     await bot.set_my_commands([
-        BotCommand("start",   "Iniciar"),
-        BotCommand("grafico", "Gráfico"),
-        BotCommand("sinais",  "Últimos sinais"),
-        BotCommand("status",  "Status"),
-        BotCommand("ajuda",   "Ajuda"),
-        BotCommand("sobre",   "Sobre o projeto"),
+        BotCommand(command="start",   description="Iniciar"),
+        BotCommand(command="grafico", description="Gráfico de acertos"),
+        BotCommand(command="sinais",  description="Últimos sinais"),
+        BotCommand(command="status",  description="Status"),
+        BotCommand(command="ajuda",   description="Ajuda"),
+        BotCommand(command="sobre",   description="Sobre o projeto"),
     ])
-    print("[BOT] Comandos registrados"
+    print("[BOT] Comandos registrados")
+
 
 # ╭───────────────────────────── startup ────────────────────────────────╮
 async def iniciar_scraping() -> None:
