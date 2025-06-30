@@ -1,55 +1,49 @@
 """
 telegrambotpy.py — Voo Milionário Bot
 ──────────────────────────────────────
-Monitora o Aviator 24 h por dia e envia sinais no Telegram sempre que o
-multiplicador mais recente é ≥ 1.99 x.
+Monitoramento 24 h/dia do Aviator; envia sinais no Telegram sempre que
+o último multiplicador é ≥ 1 .99 x.
 
-Requisitos
-──────────
-• Python ≥ 3.11      • aiogram 3.x
-• aiohttp • pytz • matplotlib
+Requisitos mínimos
+──────────────────
+• Python ≥ 3.11 • aiogram 3.x • aiohttp • pytz • matplotlib
 
-Variáveis (.env) mínimas
-────────────────────────
-TG_BOT_TOKEN   token do bot Telegram  (obrigatório)
-CHAT_ID        chat-admin (opcional, default 8101413562)
-GRUPO_ID       grupo público (opcional, default -100…)
-DEBUG          1 para exibir HTML/velas no log (opcional)
+Variáveis (.env)
+────────────────
+TG_BOT_TOKEN   token do bot – obrigatório  
+CHAT_ID        chat-admin (opcional, default 8101413562)  
+GRUPO_ID       grupo público (opcional, default -100…)  
+DEBUG          1 exibe HTML/velas no log (opcional)
 
 Autor : Pio Ginga (2025)
 """
-
 from __future__ import annotations
 
-# ──────────────────────────────────
-# Imports padrão e terceiros
-# ──────────────────────────────────
+# ╭─────────────────────────────── imports ──────────────────────────────╮
+import asyncio
+import json
 import os
 import re
-import json
 import socket
-import asyncio
 from datetime import datetime
 
 import aiohttp
-import pytz
 import matplotlib.pyplot as plt
+import pytz
 from aiogram import Bot, Dispatcher, Router
-from aiogram.enums import ParseMode
-from aiogram.types import (
-    Message,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-    FSInputFile,
-    BotCommand,
-)
-from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import Command
+from aiogram.types import (
+    BotCommand,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 from dotenv import load_dotenv
 
-# ──────────────────────────────────
-# Configuração de ambiente
-# ──────────────────────────────────
+# ╭────────────────────── configuração de ambiente ──────────────────────╮
 load_dotenv()
 
 TOKEN: str | None = os.getenv("TG_BOT_TOKEN")
@@ -86,26 +80,20 @@ STATIC_DIR  = "static"
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-# ──────────────────────────────────
-# Bot / Dispatcher / Router
-# ──────────────────────────────────
+# ╭─────────────────────────── bot & router ─────────────────────────────╮
 bot    = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp     = Dispatcher()
 router = Router()
 dp.include_router(router)
 
-# ──────────────────────────────────
-# Estado global em memória
-# ──────────────────────────────────
+# estado em memória
 VELAS: list[float]        = []
 ULTIMO_MULT: float | None = None
-ULTIMO_ENVIO_ID: str  | None = None
+ULTIMO_ENVIO_ID: str | None = None
 
-# ──────────────────────────────────
-# Funções auxiliares
-# ──────────────────────────────────
+# ╭───────────────────────────── utils ──────────────────────────────────╮
 def checar_instancia() -> bool:
-    """Impede execuções simultâneas usando arquivo-cadeado."""
+    """Evita execuções simultâneas usando arquivo-cadeado."""
     if os.path.exists(LOCK_FILE):
         print("⚠️  Bot já está em execução.")
         return False
@@ -115,18 +103,15 @@ def checar_instancia() -> bool:
 
 
 def limpar_instancia() -> None:
-    if os.path.exists(LOCK_FILE):
-        os.remove(LOCK_FILE)
+    os.remove(LOCK_FILE) if os.path.exists(LOCK_FILE) else None
 
 
 def salvar_log_sinal(sinal: dict) -> None:
-    """Acrescenta sinal no arquivo .jsonl (um por linha)."""
     with open(f"{LOG_DIR}/sinais.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(sinal, ensure_ascii=False) + "\n")
 
 
 def gerar_grafico(seq: list[float]) -> None:
-    """Gera gráfico PNG com acertos (≥ VELA_MINIMA)."""
     acertos = [1 if v >= VELA_MINIMA else 0 for v in seq]
     plt.figure(figsize=(10, 3))
     plt.plot(acertos, marker="o", linewidth=1)
@@ -136,31 +121,51 @@ def gerar_grafico(seq: list[float]) -> None:
     plt.savefig(f"{STATIC_DIR}/chart.png")
     plt.close()
 
-# ---------- regex para multiplicadores ----------
-VELA_REGEX = re.compile(r"(\d+(?:[.,]\d+)?)[xX]")
-
-def extrair_velas(html: str) -> list[float]:
-    """Extrai todos os multiplicadores do HTML."""
-    return [float(m.group(1).replace(",", ".")) for m in VELA_REGEX.finditer(html)]
-
-def prever_proxima_entrada(seq: list[float]) -> tuple[bool, float]:
-    """Heurística simples de previsão."""
-    if len(seq) < 2:
-        return False, 0.0
-    if seq[-1] < 2.0 and seq[-2] < 2.0:
-        prob = 90 + round((2.0 - seq[-1])*5 + (2.0 - seq[-2])*5, 1)
-        return True, min(prob, 99.9)
-    return False, 0.0
-
-# ──────────────────────────────────
-# HTTP – leitura direta da página
-# ──────────────────────────────────
+# ╭─────────────────────────── HTTP helpers ─────────────────────────────╮
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
     )
 }
+
+# ───────── auto-detecção de regex (executa 1× no startup) ─────────
+CANDIDATE_REGEXES: dict[str, str] = {
+    r"(\d+(?:[.,]\d+)?)[xX]\b": "número + x   (ex.: 2.31x)",
+    r'"multiplier"\s*:\s*"?(\d+(?:[.,]\d+)?)': 'JSON "multiplier": "2.31"',
+    r'data-value\s*=\s*"(\d+(?:[.,]\d+)?)"': 'data-value="2.31"',
+}
+
+VELA_REGEX: re.Pattern | None = None  # será definida em runtime
+
+
+async def detectar_melhor_regex(session: aiohttp.ClientSession) -> None:
+    """Escolhe o pattern que captura mais multiplicadores."""
+    global VELA_REGEX
+    tot = {pat: 0 for pat in CANDIDATE_REGEXES}
+
+    for _ in range(3):  # três amostras rápidas
+        try:
+            async with session.get(GAME_URL, headers=HEADERS, timeout=10) as r:
+                html = await r.text()
+        except Exception as exc:
+            print("[ERRO HTML start]", exc)
+            continue
+
+        for pat in tot:
+            tot[pat] += len(re.findall(pat, html, flags=re.I))
+
+        await asyncio.sleep(1)
+
+    melhor, qtd = max(tot.items(), key=lambda kv: kv[1])
+    if qtd == 0:
+        print("⚠️  Nenhum pattern encontrou multiplicadores – verifique manualmente.")
+        VELA_REGEX = re.compile(r"$^")  # não captura nada
+    else:
+        VELA_REGEX = re.compile(melhor, flags=re.I)
+        desc = CANDIDATE_REGEXES[melhor]
+        print(f"[AUTO-REGEX] Selecionado: {desc}  (total {qtd}/3 amostras)")
+
 
 async def obter_html(session: aiohttp.ClientSession) -> str:
     try:
@@ -173,12 +178,24 @@ async def obter_html(session: aiohttp.ClientSession) -> str:
         print("[ERRO HTML]", exc)
         return ""
 
-# ──────────────────────────────────
-# Envio de mensagens
-# ──────────────────────────────────
+# ╭────────────────────── parsing & previsão ────────────────────────────╮
+def extrair_velas(html: str) -> list[float]:
+    if VELA_REGEX is None:
+        return []
+    return [float(v.replace(",", ".")) for v in VELA_REGEX.findall(html)]
+
+
+def prever_proxima_entrada(seq: list[float]) -> tuple[bool, float]:
+    if len(seq) < 2:
+        return False, 0.0
+    if seq[-1] < 2.0 and seq[-2] < 2.0:
+        prob = 90 + round((2.0 - seq[-1]) * 5 + (2.0 - seq[-2]) * 5, 1)
+        return True, min(prob, 99.9)
+    return False, 0.0
+
+# ╭─────────────────────── envio de mensagens ───────────────────────────╮
 async def enviar_sinal(sinal: dict) -> None:
     global ULTIMO_ENVIO_ID
-
     msg_id = f"{sinal['timestamp']}-{sinal['multiplicador']}"
     if msg_id == ULTIMO_ENVIO_ID:
         return
@@ -194,7 +211,7 @@ async def enviar_sinal(sinal: dict) -> None:
         f"💰 Cadastre-se com bônus:\n👉 <a href='{BANNER_LINK}'>{BANNER_LINK}</a>"
     )
     markup = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🔗 Cadastre-se", url=BANNER_LINK)]]
+        inline_keyboard=[[InlineKeyboardButton("🔗 Cadastre-se", url=BANNER_LINK)]]
     )
     try:
         for dest in (GRUPO_ID, CHAT_ID):
@@ -221,15 +238,10 @@ async def enviar_grafico() -> None:
     except Exception as exc:
         print("[ERRO GRÁFICO]", exc)
 
-# ──────────────────────────────────
-# Handlers (comandos)
-# ──────────────────────────────────
+# ╭────────────────────────── handlers telegram ─────────────────────────╮
 @router.message(Command("start"))
 async def h_start(m: Message) -> None:
-    await m.answer(
-        "🚀 Bot Voo Milionário on-line!\n"
-        "Use /ajuda para ver todos os comandos."
-    )
+    await m.answer("🚀 Bot Voo Milionário on-line!\nUse /ajuda para comandos.")
 
 @router.message(Command("grafico"))
 async def h_grafico(m: Message) -> None:
@@ -238,8 +250,8 @@ async def h_grafico(m: Message) -> None:
 @router.message(Command("status"))
 async def h_status(m: Message) -> None:
     await m.answer(
-        f"📊 VELAS armazenadas: {len(VELAS)}\n"
-        f"🔄 Último multiplicador: {ULTIMO_MULT}\n"
+        f"📊 VELAS: {len(VELAS)}\n"
+        f"🔄 Último mult: {ULTIMO_MULT}\n"
         f"💾 Último envio: {ULTIMO_ENVIO_ID}"
     )
 
@@ -256,10 +268,10 @@ async def h_ajuda(m: Message) -> None:
 
 @router.message(Command("sinais"))
 async def h_sinais(m: Message) -> None:
-    log = f"{LOG_DIR}/sinais.jsonl"
-    if not os.path.exists(log):
+    path = f"{LOG_DIR}/sinais.jsonl"
+    if not os.path.exists(path):
         await m.answer("Nenhum sinal registrado ainda."); return
-    linhas = open(log, encoding="utf-8").read().strip().splitlines()[-5:]
+    linhas = open(path, encoding="utf-8").read().strip().splitlines()[-5:]
     if not linhas:
         await m.answer("Nenhum sinal registrado ainda."); return
     itens = []
@@ -275,12 +287,9 @@ async def h_sobre(m: Message) -> None:
         "e envio de sinais baseados em dados reais."
     )
 
-# ──────────────────────────────────
-# Monitoramento
-# ──────────────────────────────────
+# ╭──────────────────────────── monitor loop ────────────────────────────╮
 async def monitorar() -> None:
     global VELAS, ULTIMO_MULT
-
     async with aiohttp.ClientSession() as session:
         while True:
             try:
@@ -290,7 +299,7 @@ async def monitorar() -> None:
 
                 velas = extrair_velas(html)
                 if DEBUG:
-                    print("[DEBUG] Velas:", velas[-10:])
+                    print("[DEBUG] Velas extraídas:", velas[-10:])
 
                 if not velas:
                     await asyncio.sleep(10); continue
@@ -298,7 +307,7 @@ async def monitorar() -> None:
                 nova = velas[-1]
                 if nova != ULTIMO_MULT:
                     VELAS.append(nova)
-                    VELAS = VELAS[-20:]      # mantém histórico de 20
+                    VELAS = VELAS[-20:]
                     ULTIMO_MULT = nova
 
                     hora = datetime.now(LUANDA_TZ).strftime("%H:%M:%S")
@@ -309,7 +318,8 @@ async def monitorar() -> None:
                     msg  = None
                     if nova >= VELA_RARA:
                         tipo = "🚀 Rara (> 100 x)"
-                        msg  = MENSAGENS_MOTIVAS[int(datetime.now().timestamp()) % len(MENSAGENS_MOTIVAS)]
+                        idx  = int(datetime.now().timestamp()) % len(MENSAGENS_MOTIVAS)
+                        msg  = MENSAGENS_MOTIVAS[idx]
 
                     sinal = {
                         "hora": hora,
@@ -328,40 +338,39 @@ async def monitorar() -> None:
                 print("[ERRO MONITOR]", exc)
                 await asyncio.sleep(10)
 
-# ──────────────────────────────────
-# Registrar comandos
-# ──────────────────────────────────
+# ╭─────────────────────────── setup comandos ───────────────────────────╮
 async def registrar_comandos() -> None:
     await bot.set_my_commands([
-        BotCommand(command="start",   description="Iniciar"),
-        BotCommand(command="grafico", description="Gráfico de acertos"),
-        BotCommand(command="sinais",  description="Últimos sinais"),
-        BotCommand(command="status",  description="Status"),
-        BotCommand(command="ajuda",   description="Ajuda"),
-        BotCommand(command="sobre",   description="Sobre o projeto"),
+        BotCommand("start",   "Iniciar"),
+        BotCommand("grafico", "Gráfico"),
+        BotCommand("sinais",  "Últimos sinais"),
+        BotCommand("status",  "Status"),
+        BotCommand("ajuda",   "Ajuda"),
+        BotCommand("sobre",   "Sobre o projeto"),
     ])
     print("[BOT] Comandos registrados")
 
-# ──────────────────────────────────
-# Inicialização
-# ──────────────────────────────────
+# ╭───────────────────────────── startup ────────────────────────────────╮
 async def iniciar_scraping() -> None:
     if not checar_instancia():
         return
     try:
         await registrar_comandos()
+
+        # auto-detecção do pattern logo no início
+        async with aiohttp.ClientSession() as sess:
+            await detectar_melhor_regex(sess)
+
         asyncio.create_task(monitorar())
         await dp.start_polling(bot)
     finally:
         limpar_instancia()
 
-# ──────────────────────────────────
-# Entry-point
-# ──────────────────────────────────
+# ╭────────────────────────── entry-point  ──────────────────────────────╮
 if __name__ == "__main__":
     asyncio.run(iniciar_scraping())
 
-    # Fake-listener para Render free tier (porta obrigatória)
+    # fake-listener para Render (porta obrigatória)
     if os.getenv("RENDER"):
         port = int(os.getenv("PORT", 10000))
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
