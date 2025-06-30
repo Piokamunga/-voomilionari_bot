@@ -317,16 +317,21 @@ async def on_shutdown(app):
     limpar_instancia()
     print("[WEBHOOK] Removido com sucesso")
 
-async def main():
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"https://voomilionari-bot.onrender.com{WEBHOOK_PATH}"
+
+
+def create_app() -> web.Application:
+    """Cria e configura a aplicação aiohttp com webhook."""
     app = web.Application()
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
 
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp)
+    return app
 
-    port = int(os.getenv("PORT", 10000))
-    web.run_app(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.getenv("PORT", 10000))
+    web.run_app(create_app(), host="0.0.0.0", port=port)
