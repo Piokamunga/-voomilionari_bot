@@ -14,3 +14,5 @@ pytz>=2024.1
 matplotlib
 selenium
 webdriver-manager
+python-dotenv
+websockets
