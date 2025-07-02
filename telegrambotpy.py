@@ -44,7 +44,9 @@ from aiogram.types import (
 from dotenv import load_dotenv
 
 # WebSocket helper (token + base URL)
-from save_html_loop_ws import get_token, WS_BASE_URL  # type: ignore
+USE_WS: bool = os.getenv("USE_WS", "1") == "1"
+if USE_WS:
+    from save_html_loop_ws import get_token, WS_BASE_URL  # type: ignore
 
 # ╭────────────────────── configuração de ambiente ──────────────────────╮
 load_dotenv()
