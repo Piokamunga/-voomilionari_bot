@@ -2,48 +2,43 @@
 main.py – Orquestrador Voo Milionário (Render Web Service)
 ───────────────────────────────────────────────────────────
 Executa em paralelo:
-• Bot Telegram (polling) – telegrambotpy.py
+• Bot Telegram – telegrambotpy.py
 • Health‑check HTTP na porta 10000
-• Loop WebSocket Spribe (save_html_loop_ws.py) que recebe multiplicadores em tempo real
+• Scraping HTML (save_html_loop.py)
+• WebSocket tempo real (save_html_loop_ws.py)
 """
 
-from __future__ import annotations
-
 import asyncio
+import os
 from aiohttp import web
 
-from telegrambotpy import iniciar_scraping          # bot Telegram em polling
-from save_html_loop_ws import loop_ws as salvar_html  # loop WebSocket em tempo real
+from telegrambotpy import iniciar_bot
+from save_html_loop import fetch_and_save_loop
+from save_html_loop_ws import iniciar_ws_loop
 
-# ╭────────────────────────── Servidor HTTP health-check ─────────────────────────╮
-async def iniciar_servidor() -> None:
-    async def handle(request):
-        return web.Response(
-            text="🤖 Voo Milionário rodando com WebSocket! 🚀"
-        )
+PORT = int(os.getenv("PORT", "10000"))
 
+# ───────────── Health Check HTTP (Render exige porta aberta) ───────────── #
+async def handle_health(_: web.Request) -> web.Response:
+    return web.Response(text="✅ Voo Milionário Online")
+
+async def start_web_server():
     app = web.Application()
-    app.add_routes([web.get("/", handle)])
-
+    app.router.add_get("/", handle_health)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, host="0.0.0.0", port=10000)
+    site = web.TCPSite(runner, port=PORT)
     await site.start()
-    print("🌐 Health‑check HTTP iniciado em http://0.0.0.0:10000/")
+    print(f"🌐 Servidor HTTP iniciado na porta {PORT}")
 
-
-# ╭──────────────────────────── Rotina principal ─────────────────────────────╮
-async def main() -> None:
+# ───────────────────────────── Executor paralelo ────────────────────────── #
+async def main():
     await asyncio.gather(
-        iniciar_scraping(),   # bot Telegram (polling)
-        iniciar_servidor(),   # health-check HTTP
-        salvar_html(),        # WebSocket Spribe (multiplicadores)
+        iniciar_bot(),              # Telegram
+        start_web_server(),         # Health check
+        fetch_and_save_loop(),      # HTML scraping
+        iniciar_ws_loop(),          # WebSocket Spribe
     )
 
-
-# ╭──────────────────────────── Entry-point ─────────────────────────────╮
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("⛔ Encerrado manualmente.")
+    asyncio.run(main())
