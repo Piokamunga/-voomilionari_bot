@@ -6,10 +6,8 @@ Executa em paralelo:
 • Health‑check HTTP na porta 10000
 • Scraping HTML (save_html_loop.py)
 • WebSocket tempo real (save_html_loop_ws.py)
-• Navegador headless via Selenium (save_html_loop_selenium.py)
 """
 
-from __future__ import annotations
 import asyncio
 import os
 from aiohttp import web
@@ -17,7 +15,6 @@ from aiohttp import web
 from telegrambotpy import iniciar_bot
 from save_html_loop import fetch_and_save_loop
 from save_html_loop_ws import iniciar_ws_loop
-from save_html_loop_selenium import loop_principal as iniciar_selenium_loop
 
 PORT = int(os.getenv("PORT", "10000"))
 
@@ -39,9 +36,8 @@ async def main():
     await asyncio.gather(
         iniciar_bot(),              # Telegram
         start_web_server(),         # Health check
-        fetch_and_save_loop(),      # HTML scraping simples
+        fetch_and_save_loop(),      # HTML scraping
         iniciar_ws_loop(),          # WebSocket Spribe
-        iniciar_selenium_loop(),    # Selenium headless
     )
 
 if __name__ == "__main__":
