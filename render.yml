@@ -6,6 +6,6 @@ services:
     startCommand: bash start.sh
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10
+  value: "3.10.13"
     plan: free
     autoDeploy: true
