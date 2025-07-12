@@ -12,8 +12,8 @@ uvloop>=0.17.0
 loguru>=0.7.0
 pytz>=2024.1
 webdriver-manager
-aiogram==3.*
 python-dotenv
 matplotlib
 selenium==4.*
 websockets
+selenium-wire
