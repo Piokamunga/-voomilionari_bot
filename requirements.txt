@@ -1,6 +1,6 @@
 fastapi
 jinja2
-aiohttp==3.9.5
+aiohttp>=3.8.0
 uvicorn
 aiogram==3.7.0
 requests>=2.28.1
