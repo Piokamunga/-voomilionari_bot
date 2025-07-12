@@ -1,40 +1,28 @@
-"""
-save_html_loop_ws.py – Leitor WebSocket do Aviator Spribe
-──────────────────────────────────────────────────────────
-Conecta em tempo real no WebSocket da Spribe e extrai multiplicadores
-em tempo real, enviando sinais automaticamente via Telegram.
-"""
+""" save_html_loop_ws.py – WebSocket Spribe para Aviator (automatizado) """
 
 import asyncio
-import json
 import websockets
-from telegrambotpy import enviar_sinal
+from datetime import datetime
+import os
 
-URL_WS = "wss://aviator.spribegaming.com/..."  # Substitua pela URL correta
+# ⚠️ Este valor será substituído automaticamente por extract_ws_url.py
+URL_WS = "wss://spribe-host"  # Substituirá automaticamente com o real
 
-async def processar_mensagem(data: dict):
-    if "crash" in data:
-        valor = data["crash"].get("point")
-        if valor:
-            try:
-                valor = float(valor)
-                print(f"[WS] Voo detectado: {valor:.2f}x")
-                if valor >= 2.0:
-                    await enviar_sinal(valor)
-            except Exception as e:
-                print("[ERRO] Conversão WebSocket:", e)
-
-async def iniciar_ws_loop():
-    print("[WS] Iniciando conexão WebSocket...")
+async def loop_websocket():
+    os.makedirs("logs", exist_ok=True)
     while True:
         try:
+            print(f"[WS] Conectando a {URL_WS} ...")
             async with websockets.connect(URL_WS) as ws:
-                async for msg in ws:
-                    try:
-                        data = json.loads(msg)
-                        await processar_mensagem(data)
-                    except Exception as e:
-                        print("[ERRO] JSON WebSocket:", e)
+                print("[WS] Conectado com sucesso!")
+                while True:
+                    msg = await ws.recv()
+                    if "coefficient" in msg:
+                        agora = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                        nome_arquivo = f"logs/ws_{agora}.json"
+                        with open(nome_arquivo, "w", encoding="utf-8") as f:
+                            f.write(msg)
+                        print(f"[WS] Mensagem salva: {nome_arquivo}")
         except Exception as e:
-            print("[ERRO] WebSocket desconectado. Reconectando em 5s...", e)
+            print(f"[ERRO WS] {e}")
             await asyncio.sleep(5)
