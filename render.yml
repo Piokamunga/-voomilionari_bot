@@ -1,18 +1,11 @@
 services:
-  - type: worker
+  - type: web
     name: voo-milionario
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: bash start.sh
     envVars:
-      - key: TG_BOT_TOKEN
-        value: "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
-      - key: CHAT_ID
-        value: "8101413562"
-      - key: GRUPO_ID
-        value: "-1002769928832"
-      - key: GB_USERNAME
-        value: "932071284"
-      - key: GB_PASSWORD
-        value: "932071284t"
+      - key: PYTHON_VERSION
+        value: 3.10
+    plan: free
+    autoDeploy: true
