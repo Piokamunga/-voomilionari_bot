@@ -1,11 +1,23 @@
 services:
   - type: web
-    name: voo-milionario
+    name: voo-milionario-bot
     env: python
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    plan: free
+    region: frankfurt
+    runtime: python
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -m undetected_chromedriver.patcher
     startCommand: bash start.sh
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-  value: "3.10.13"
-    plan: free
-    autoDeploy: true
+        value: 3.11.8
+      - key: TOKEN
+        value: "7585234067:AAF1xfSbMCh7LOckXViD2_iUfKig7GYgwO4"
+      - key: GROUP_ID
+        value: "-1002769928832"
+    healthCheckPath: /
+    domains:
+      - voo-milionari-bot.onrender.com
