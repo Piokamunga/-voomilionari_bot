@@ -21,7 +21,7 @@ def analisar_multiplicadores(html: str) -> str | None:
         faixa_vermelha = f"{round(uniform(1.05, 1.2), 2)} | {round(uniform(10.0, 15.0), 2)}"
         green_exemplo = f"{round(uniform(100, 250), 2)} | {round(uniform(1.0, 1.5), 1)}"
 
-        mensagem = f"""
+        return f"""
 <b>GRUPO AVIATOR VIP:</b>
 🚨 <b>ENTRADA CONFIRMADA</b> 🚨
 
@@ -29,17 +29,11 @@ def analisar_multiplicadores(html: str) -> str | None:
 🤖 <b>Padrão:</b> {padrao}
 
 🚥 {faixa_vermelha}
-
 💵 <b>Saia no</b> {alvo}x
-
 🌪️ <b>Faça até 5 fixas!</b>
 
 <b>Resumo:</b>
-
 📱 Acesse o Aviator Velas Altas
-
 ✅ ✅ <b>GREEN</b> ({green_exemplo}) ✅ ✅
-"""
-        return mensagem.strip()
-
+""".strip()
     return None
