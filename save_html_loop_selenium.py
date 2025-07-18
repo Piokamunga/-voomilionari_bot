@@ -1,25 +1,3 @@
-"""
-save_html_loop_selenium.py – Scraper Aviator com navegador real
-───────────────────────────────────────────────────────────────
-Usa Chrome Headless via Selenium para capturar HTML renderizado
-pelo navegador e extrair multiplicadores reais do Aviator.
-
-✔ Ideal para páginas com JavaScript
-✔ Executa scraping a cada X segundos
-✔ Extrai automaticamente os multiplicadores (ex: 3,50x, 1x)
-
-Requisitos:
-• chrome/chromium + webdriver
-• selenium
-• render.com: ativar Chromium no build (ver docs)
-
-Variáveis de ambiente:
-────────────────────────
-GAME_URL         link do Aviator (default: GoldenBet)
-SCRAPE_INTERVAL  intervalo entre capturas (default: 30s)
-DEBUG            ativa debug extra se = "1"
-"""
-
 from __future__ import annotations
 import os
 import re
@@ -29,11 +7,14 @@ from typing import Pattern
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from analisador_ia import processar_multiplicadores
 
 # ─────────────────────────────────────────────────────────────
-GAME_URL = os.getenv("GAME_URL", "https://m.goldenbet.ao/gameGo?id=...")
+GAME_URL = os.getenv("GAME_URL", "https://m.goldenbet.ao/gameGo?id=aviator")
 INTERVAL = int(os.getenv("SCRAPE_INTERVAL", "30"))  # segundos
 DEBUG = os.getenv("DEBUG", "0") == "1"
 os.makedirs("logs", exist_ok=True)
@@ -48,7 +29,6 @@ VELA_REGEX: Pattern | None = None
 
 # ─────────────────────────────────────────────────────────────
 def detectar_melhor_regex(html: str) -> Pattern | None:
-    """Seleciona o regex com mais acertos no HTML."""
     max_hits = 0
     selecionado = None
     for padrao, desc in CANDIDATE_REGEXES.items():
@@ -62,46 +42,52 @@ def detectar_melhor_regex(html: str) -> Pattern | None:
 
 # ─────────────────────────────────────────────────────────────
 def criar_driver() -> webdriver.Chrome:
-    """Cria uma instância headless do Chrome para scraping."""
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1280,720")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     return webdriver.Chrome(options=options)
 
 # ─────────────────────────────────────────────────────────────
 async def capturar_html_e_extrair():
     global VELA_REGEX
-
     try:
         driver = criar_driver()
         driver.get(GAME_URL)
-        await asyncio.sleep(10)  # tempo para carregar JS (ajustável)
 
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "char"))
+        )
+        await asyncio.sleep(5)
         html = driver.page_source
         driver.quit()
     except Exception as e:
         print("[ERRO SELENIUM]", e)
         return
 
-    # Detectar melhor regex se necessário
     if VELA_REGEX is None or not VELA_REGEX.search(html):
         VELA_REGEX = detectar_melhor_regex(html)
 
-    # Salvar HTML para debug
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
     fname = f"logs/html_{ts}.html"
     with open(fname, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # Extrair velas
     velas = []
     if VELA_REGEX:
         velas = [float(v.replace(",", ".")) for v in VELA_REGEX.findall(html)]
 
     print(f"[SAVE] {fname} – {len(velas)} multiplicadores detectados")
+
+    if len(velas) == 0:
+        print("[DEBUG] Nenhum multiplicador encontrado. Trecho do HTML:")
+        print(html[:1000])
+    else:
+        await processar_multiplicadores(velas)
+
     if DEBUG:
         for i, linha in enumerate(html.splitlines()):
             if "x" in linha and len(linha) < 500:
