@@ -1,34 +1,50 @@
-""" main.py – VOO MILIONÁRIO (HTML + WebSocket + Webhook Telegram) """
+""" main.py – Orquestrador Voo Milionário (HTML + Selenium + WebSocket + Webhook Telegram)
+────────────────────────────────────────────────────────────────────────────────────────────
+Executa:
+• Scraping via HTML (save_html_loop.py)
+• Scraping via Selenium (save_html_loop_selenium.py)
+• Captura de multiplicadores via WebSocket (save_html_loop_ws.py)
+• Bot Telegram via webhook (telegrambotpy.py)
+• Atualização dinâmica do WebSocket (extract_ws_url.py)
+• Health check HTTP (porta 10000 para Render)
+"""
 
+import os
 import asyncio
+import threading
 from aiohttp import web
 
+# ───── IMPORTAÇÕES DOS MÓDULOS INTERNOS ───── #
 from save_html_loop import loop_salvar_html
+from save_html_loop_selenium import loop_salvar_html_selenium
+from save_html_loop_ws import loop_websocket
 from telegrambotpy import iniciar_bot
-from extract_ws_url import atualizar_ws_url_no_script  # 🧠 Atualiza URL WS dinâmico
+from extract_ws_url import atualizar_ws_url_no_script
 
-# === ROTA DE STATUS PARA MONITORAMENTO ===
+# ───── ROTA DE SAÚDE PARA MONITORAMENTO (Render) ───── #
 async def health_check(request):
-    return web.Response(text="✅ Bot VOO MILIONÁRIO Online via HTML + WS + Webhook")
+    return web.Response(text="✅ Voo Milionário Online – HTML + Selenium + WS + Telegram")
 
-# === INICIALIZAÇÃO DE TODAS AS TAREFAS ===
+# ───── INICIALIZAÇÃO ASSÍNCRONA DE TODOS OS PROCESSOS ───── #
 async def start_all():
-    await atualizar_ws_url_no_script()  # Extrai e atualiza URL do WebSocket automaticamente
+    await atualizar_ws_url_no_script()  # Atualiza automaticamente o WebSocket extraído
 
     await asyncio.gather(
-        loop_salvar_html(),  # Loop scraping HTML
-        iniciar_bot(),       # Inicia o bot Telegram via webhook
+        loop_salvar_html(),           # Coleta via HTML estático (requests)
+        loop_salvar_html_selenium(),  # Coleta via HTML dinâmico (Selenium)
+        loop_websocket(),             # Escuta WebSocket em tempo real
+        iniciar_bot(),                # Bot Telegram via webhook
     )
 
-# === APP HTTP PARA RENDER ===
+# ───── FUNÇÃO PRINCIPAL ───── #
 def main():
     app = web.Application()
-    app.router.add_get("/", health_check)  # http://...:10000 para ver o status
+    app.router.add_get("/", health_check)
 
     loop = asyncio.get_event_loop()
-    loop.create_task(start_all())         # Inicia scraping + bot
+    loop.create_task(start_all())  # Inicia todos os loops em paralelo
 
-    web.run_app(app, port=10000)          # Porta para Render escutar
+    web.run_app(app, port=10000)  # Porta obrigatória no Render
 
 if __name__ == "__main__":
     main()
