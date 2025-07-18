@@ -16,3 +16,4 @@ selenium>=4.0.0,<5.0.0
 websockets
 selenium-wire
 undetected-chromedriver==3.5.5
+blinker==1.7.0
