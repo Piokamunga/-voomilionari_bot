@@ -6,9 +6,10 @@ services:
     region: frankfurt
     runtime: python
     buildCommand: |
+      apt-get update
+      apt-get install -y chromium wget unzip xvfb
       pip install --upgrade pip
       pip install -r requirements.txt
-      python -m undetected_chromedriver.patcher
     startCommand: bash start.sh
     autoDeploy: true
     envVars:
