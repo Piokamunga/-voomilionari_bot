@@ -1,4 +1,5 @@
-""" main.py – Orquestrador Voo Milionário (HTML + Selenium + WebSocket + Webhook Telegram)
+"""
+main.py – Orquestrador Voo Milionário (HTML + Selenium + WebSocket + Webhook Telegram)
 ────────────────────────────────────────────────────────────────────────────────────────────
 Executa:
 • Scraping via HTML (save_html_loop.py)
@@ -6,12 +7,11 @@ Executa:
 • Captura de multiplicadores via WebSocket (save_html_loop_ws.py)
 • Bot Telegram via webhook (telegrambotpy.py)
 • Atualização dinâmica do WebSocket (extract_ws_url.py)
-• Health check HTTP (porta 10000 para Render)
+• Health check HTTP (porta definida por $PORT para Render)
 """
 
 import os
 import asyncio
-import threading
 from aiohttp import web
 
 # ───── IMPORTAÇÕES DOS MÓDULOS INTERNOS ───── #
@@ -27,7 +27,10 @@ async def health_check(request):
 
 # ───── INICIALIZAÇÃO ASSÍNCRONA DE TODOS OS PROCESSOS ───── #
 async def start_all():
-    await atualizar_ws_url_no_script()  # Atualiza automaticamente o WebSocket extraído
+    try:
+        await atualizar_ws_url_no_script()  # Atualiza automaticamente o WebSocket extraído
+    except Exception as e:
+        print(f"[⚠️] Falha ao atualizar WebSocket automaticamente: {e}")
 
     await asyncio.gather(
         loop_salvar_html(),           # Coleta via HTML estático (requests)
@@ -38,13 +41,15 @@ async def start_all():
 
 # ───── FUNÇÃO PRINCIPAL ───── #
 def main():
+    port = int(os.environ.get("PORT", 10000))  # Compatível com Render
+
     app = web.Application()
     app.router.add_get("/", health_check)
 
     loop = asyncio.get_event_loop()
-    loop.create_task(start_all())  # Inicia todos os loops em paralelo
+    loop.create_task(start_all())
 
-    web.run_app(app, port=10000)  # Porta obrigatória no Render
+    web.run_app(app, port=port)
 
 if __name__ == "__main__":
     main()
