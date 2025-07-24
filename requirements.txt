@@ -1,16 +1,30 @@
-jinja2
-aiohttp>=3.8.0
-aiogram==3.7.0
-requests>=2.31.0
-python-dotenv>=1.0.0
-beautifulsoup4>=4.12.3
-lxml>=4.9.3
-uvloop>=0.17.0
-loguru>=0.7.2
-pytz>=2024.1
-webdriver-manager>=4.0.1
-selenium>=4.10.0,<5.0.0
-websockets>=11.0.3
-selenium-wire>=5.1.0
-undetected-chromedriver==3.5.5
-blinker==1.7.0
+# ───── Frameworks Web ─────
+fastapi                        # Para endpoints HTTP e estrutura do app
+jinja2                         # Se houver templates HTML (não usado ainda no código atual)
+aiohttp>=3.8.0                 # Usado no servidor web e requisições assíncronas
+uvicorn                        # Servidor ASGI para rodar o FastAPI
+
+# ───── Bot Telegram ─────
+aiogram==3.7.0                 # OK se você estiver usando um bot com polling (não webhook)
+blinker==1.7.0                 # Suporte de sinais do Aiogram (não obrigatório, mas pode ser útil)
+
+# ───── Scraping ─────
+requests>=2.31.0               # Para scraping HTML direto
+beautifulsoup4>=4.12.3         # Usado para parse HTML
+lxml>=4.9.3                    # Parser veloz para o BeautifulSoup
+
+# ───── WebSocket ─────
+websockets>=11.0.3             # Captura de dados via WebSocket
+
+# ───── Web Scraping Dinâmico ─────
+selenium>=4.10.0,<5.0.0        # Navegação web com browser real
+webdriver-manager>=4.0.1       # Gerencia drivers do Selenium (ChromeDriver, etc)
+undetected-chromedriver==3.5.5 # Evita detecção em sites como o da Blaze
+selenium-wire>=5.1.0           # Intercepta tráfego WebSocket para descobrir endpoints dinâmicos
+
+# ───── Utilitários e Performance ─────
+python-dotenv>=1.0.0           # Leitura de variáveis do .env
+uvloop>=0.17.0                 # Melhora performance do asyncio no Linux
+loguru>=0.7.2                  # Logging avançado e colorido
+pytz>=2024.1                   # Manipulação de timezones
+matplotlib>=3.7.3              # (⚠️ Não utilizado nos arquivos atuais)
