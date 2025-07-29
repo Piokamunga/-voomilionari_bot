@@ -6,81 +6,57 @@ Contém duas funções:
 • processar_multiplicadores(lista) – via WebSocket em tempo real
 """
 
-import re
-from random import uniform, randint
-from typing import Optional
+import asyncio
+import os
+import json
+import aiohttp
+import websockets
+from analisador_ia import processar_multiplicadores
+from telegram import Bot
 
-def analisar_multiplicadores(html: str) -> Optional[str]:
-    """
-    Analisa os multiplicadores contidos no HTML e retorna mensagem VIP.
-    """
-    mults = re.findall(r'(\d+(?:\.\d+)?)x', html)
-    mults = [float(m) for m in mults][-20:]
+# ✅ Variáveis de ambiente (ajuste no Replit ou .env)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "SEU_TOKEN_AQUI")
+CHAT_ID = os.getenv("CHAT_ID", "SEU_CHAT_ID_AQUI")
+WEBSOCKET_URL = os.getenv("WS_URL", "wss://aviator-bets-pragmatic.softswiss.net/ws")
 
-    if len(mults) < 10:
-        return None
+bot = Bot(token=TELEGRAM_TOKEN)
+multiplicadores = []
 
-    ultimos = mults[-5:]
-    baixos = sum(1 for m in ultimos if m < 1.5)
-    altos = sum(1 for m in ultimos if m >= 2.0)
+async def enviar_alerta(msg: str):
+    try:
+        await bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode="HTML")
+        print("[✅] Alerta enviado com sucesso!")
+    except Exception as e:
+        print(f"[❌] Erro ao enviar alerta: {e}")
 
-    if baixos >= 4 or altos >= 3:
-        entrada = round(uniform(2.8, 3.5), 2)
-        alvo = round(entrada + uniform(0.5, 1.5), 2)
-        padrao = f"VA 0{randint(1, 9)}"
-        faixa_vermelha = f"{round(uniform(1.05, 1.2), 2)} | {round(uniform(10.0, 15.0), 2)}"
-        green_exemplo = f"{round(uniform(100, 250), 2)} | {round(uniform(1.0, 1.5), 1)}"
+async def consumir_ws():
+    print(f"[🌐] Conectando ao WebSocket: {WEBSOCKET_URL}")
+    try:
+        async with websockets.connect(WEBSOCKET_URL) as ws:
+            while True:
+                msg = await ws.recv()
+                try:
+                    data = json.loads(msg)
+                    if isinstance(data, list):
+                        for item in data:
+                            m = item.get("crash_point")
+                            if m and isinstance(m, (int, float)):
+                                multiplicadores.append(float(m))
+                                print(f"[📈] Novo multiplicador: {m}x")
 
-        return f"""
-<b>GRUPO AVIATOR VIP:</b>
-🚨 <b>ENTRADA CONFIRMADA</b> 🚨
+                                alerta = processar_multiplicadores(multiplicadores)
+                                if alerta:
+                                    await enviar_alerta(alerta)
 
-🎮 <b>Jogo:</b> Aviator Velas Altas  
-🤖 <b>Padrão:</b> {padrao}
+                except json.JSONDecodeError:
+                    continue
+    except Exception as e:
+        print(f"[❌] Erro no WebSocket: {e}")
+        await asyncio.sleep(10)
+        await consumir_ws()  # reconectar automaticamente
 
-🚥 {faixa_vermelha}
-💵 <b>Saia no</b> {alvo}x
-🌪️ <b>Faça até 5 fixas!</b>
+async def main():
+    await consumir_ws()
 
-<b>Resumo:</b>
-📱 Acesse o Aviator Velas Altas
-✅ ✅ <b>GREEN</b> ({green_exemplo}) ✅ ✅
-""".strip()
-
-    return None
-
-
-def processar_multiplicadores(lista: list[float]) -> Optional[str]:
-    """
-    Recebe lista de multiplicadores (ex: do WebSocket) e gera alerta VIP se padrão for detectado.
-    """
-    mults = lista[-20:]  # mantém os últimos 20
-
-    if len(mults) < 10:
-        return None
-
-    ultimos = mults[-5:]
-    baixos = sum(1 for m in ultimos if m < 1.5)
-    altos = sum(1 for m in ultimos if m >= 2.0)
-
-    if baixos >= 4 or altos >= 3:
-        entrada = round(uniform(2.8, 3.5), 2)
-        alvo = round(entrada + uniform(0.5, 1.5), 2)
-        padrao = f"VA 0{randint(1, 9)}"
-        faixa_vermelha = f"{round(uniform(1.05, 1.2), 2)} | {round(uniform(10.0, 15.0), 2)}"
-        green_exemplo = f"{round(uniform(100, 250), 2)} | {round(uniform(1.0, 1.5), 1)}"
-
-        return f"""
-<b>ALERTA AO VIVO – MULTIPLICADOR DETECTADO</b>
-
-🎮 <b>Jogo:</b> Aviator WS Real-Time
-📈 <b>Padrão:</b> {padrao}
-
-🚥 {faixa_vermelha}
-💵 <b>Meta:</b> {alvo}x
-🌪️ <b>Entrada:</b> {entrada}x
-
-✅ Green Exemplo: {green_exemplo}
-""".strip()
-
-    return None
+if __name__ == "__main__":
+    asyncio.run(main())
