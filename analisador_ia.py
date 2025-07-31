@@ -11,7 +11,6 @@ import os
 import json
 import aiohttp
 import websockets
-from analisador_ia import processar_multiplicadores
 from telegram import Bot
 
 # ✅ Variáveis de ambiente (ajuste no Replit ou .env)
@@ -21,6 +20,9 @@ WEBSOCKET_URL = os.getenv("WS_URL", "wss://aviator-bets-pragmatic.softswiss.net/
 
 bot = Bot(token=TELEGRAM_TOKEN)
 multiplicadores = []
+
+# Importação da função processar_multiplicadores do novo módulo
+from processador_multiplicadores import processar_multiplicadores
 
 async def enviar_alerta(msg: str):
     try:
@@ -60,3 +62,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
